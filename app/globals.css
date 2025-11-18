@@ -101,7 +101,7 @@
 }
 
 .phone-scrollbar-visible {
-  scrollbar-color: rgba(156, 163, 175, 0.6) transparent;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
 
 .phone-scrollbar-hidden {
@@ -109,7 +109,7 @@
 }
 
 .phone-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
   transition: opacity 0.3s ease-in-out;
 }
 
@@ -127,7 +127,7 @@
 }
 
 .phone-scrollbar-visible::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.6);
+  background: rgba(156, 163, 175, 0.3);
 }
 
 .phone-scrollbar-hidden::-webkit-scrollbar-thumb {
@@ -135,7 +135,7 @@
 }
 
 .phone-scrollbar-visible::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.7);
+  background: rgba(107, 114, 128, 0.5);
 }
 
 /* Animation pour le menu bulle */

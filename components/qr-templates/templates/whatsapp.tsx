@@ -29,11 +29,11 @@ export function WhatsAppTemplate() {
 
   return (
     <div 
-      className="w-full min-h-full flex flex-col"
+      className="w-full h-full flex flex-col"
       style={{ ...backgroundStyle, ...typographyStyle }}
     >
-      {/* Header WhatsApp */}
-      <div className="w-full bg-[#075E54] px-4 py-3 flex items-center justify-between">
+      {/* Header WhatsApp - Fixe en haut */}
+      <div className="w-full bg-[#075E54] px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3 flex-1">
           {/* Icône profil */}
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -41,7 +41,7 @@ export function WhatsAppTemplate() {
           </div>
           {/* Numéro de téléphone */}
           <div className="flex-1 min-w-0">
-            <p className="text-white font-medium text-sm" style={typographyStyle}>
+            <p className="text-white font-medium text-xs truncate" style={typographyStyle}>
               {displayPhone}
             </p>
           </div>
@@ -54,18 +54,19 @@ export function WhatsAppTemplate() {
         </div>
       </div>
 
-      {/* Zone de chat */}
+      {/* Zone de chat - Scrollable au milieu */}
       <div 
-        className="flex-1 px-4 py-6 overflow-y-auto"
+        className="flex-1 px-4 py-6 overflow-y-auto overflow-x-hidden"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='whatsapp-pattern' x='0' y='0' width='100' height='100' patternUnits='userSpaceOnUse'%3E%3Ccircle cx='20' cy='20' r='1' fill='%23ffffff' opacity='0.05'/%3E%3Ccircle cx='80' cy='80' r='1' fill='%23ffffff' opacity='0.05'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23whatsapp-pattern)'/%3E%3C/svg%3E")`,
           backgroundSize: '100px 100px',
+          minHeight: 0
         }}
       >
         {/* Bulle de message */}
         <div className="flex justify-end mb-4">
           <div 
-            className="max-w-[75%] rounded-lg px-3 py-2 shadow-sm"
+            className="max-w-[85%] rounded-lg px-3 py-2 shadow-sm"
             style={{ 
               backgroundColor: '#DCF8C6',
               ...typographyStyle 
@@ -87,8 +88,8 @@ export function WhatsAppTemplate() {
         </div>
       </div>
 
-      {/* Barre de saisie */}
-      <div className="w-full bg-white px-3 py-2 border-t border-gray-200">
+      {/* Barre de saisie - Fixe en bas */}
+      <div className="w-full bg-white px-3 py-2 border-t border-gray-200 flex-shrink-0">
         <div className="flex items-center gap-2">
           {/* Emoji */}
           <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">

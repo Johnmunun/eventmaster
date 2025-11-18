@@ -93,7 +93,7 @@ export function TemplateBuilder({ onSave }: TemplateBuilderProps) {
       {/* Colonne droite : Preview mobile */}
       <div className="order-1 lg:order-2 flex flex-col items-center lg:sticky lg:top-0">
         {/* Toggle Switch */}
-        <div className="mb-4 w-full max-w-[280px]">
+        <div className="mb-4 w-full" style={{ maxWidth: selectedTemplate === 'whatsapp' ? '320px' : '280px' }}>
           <div className="relative inline-flex rounded-lg border-2 border-green-500 overflow-hidden bg-white">
             <button
               onClick={() => setViewMode('preview')}
@@ -120,7 +120,10 @@ export function TemplateBuilder({ onSave }: TemplateBuilderProps) {
         
         <div className="relative">
           {viewMode === 'preview' ? (
-            <PhoneMockup>
+            <PhoneMockup 
+              width={selectedTemplate === 'whatsapp' ? 320 : 280}
+              height={selectedTemplate === 'whatsapp' ? 640 : 560}
+            >
               {TemplateComponent ? (
                 <TemplateComponent />
               ) : (

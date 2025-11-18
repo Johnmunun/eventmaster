@@ -6,9 +6,11 @@ import { DeviceBar } from "./device-bar"
 interface PhoneMockupProps {
   children: ReactNode
   className?: string
+  width?: number
+  height?: number
 }
 
-export function PhoneMockup({ children, className = "" }: PhoneMockupProps) {
+export function PhoneMockup({ children, className = "", width = 280, height = 560 }: PhoneMockupProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isScrolling, setIsScrolling] = useState(false)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -42,7 +44,10 @@ export function PhoneMockup({ children, className = "" }: PhoneMockupProps) {
   }, [])
 
   return (
-    <div className={`relative w-[280px] h-[560px] bg-gray-900 rounded-[3rem] p-2 shadow-2xl ${className}`}>
+    <div 
+      className={`relative bg-gray-900 rounded-[3rem] p-2 shadow-2xl ${className}`}
+      style={{ width: `${width}px`, height: `${height}px` }}
+    >
       {/* Écran du téléphone */}
       <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative">
         {/* Menu bulle en bas */}
