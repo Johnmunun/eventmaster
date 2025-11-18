@@ -236,3 +236,4 @@ Adaptation des fonctionnalités d'online-qr-generator.com au contexte événemen
 5. **Temps Réel** : Modifications instantanées pendant l'événement
 
 
+

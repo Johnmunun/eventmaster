@@ -10,12 +10,16 @@ const poppins = Poppins({
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-poppins',
   display: 'swap',
+  fallback: ['system-ui', 'arial'],
+  adjustFontFallback: true,
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: '--font-jetbrains-mono',
   display: 'swap',
+  fallback: ['monospace', 'Courier New'],
+  adjustFontFallback: true,
 });
 
 const playfair = Playfair_Display({
@@ -23,6 +27,8 @@ const playfair = Playfair_Display({
   weight: ['400', '500', '600', '700'],
   variable: '--font-playfair',
   display: 'swap',
+  fallback: ['Georgia', 'serif'],
+  adjustFontFallback: true,
 });
 
 const montserrat = Montserrat({
@@ -30,6 +36,8 @@ const montserrat = Montserrat({
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-montserrat',
   display: 'swap',
+  fallback: ['system-ui', 'arial'],
+  adjustFontFallback: true,
 });
 
 const roboto = Roboto({
@@ -37,6 +45,8 @@ const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
   variable: '--font-roboto',
   display: 'swap',
+  fallback: ['system-ui', 'arial'],
+  adjustFontFallback: true,
 });
 
 const lato = Lato({
@@ -44,6 +54,8 @@ const lato = Lato({
   weight: ['300', '400', '700'],
   variable: '--font-lato',
   display: 'swap',
+  fallback: ['system-ui', 'arial'],
+  adjustFontFallback: true,
 });
 
 const dancingScript = Dancing_Script({
@@ -51,6 +63,8 @@ const dancingScript = Dancing_Script({
   weight: ['400', '500', '600', '700'],
   variable: '--font-dancing',
   display: 'swap',
+  fallback: ['cursive', 'serif'],
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { db } from "@/lib/db"
 
 export async function GET(
   request: NextRequest,
@@ -10,7 +10,7 @@ export async function GET(
     const qrId = resolvedParams.id
 
     // Récupérer le QR code
-    const qrCode = await prisma.qrCode.findUnique({
+    const qrCode = await db.qrCode.findUnique({
       where: { id: qrId },
       select: {
         id: true,
