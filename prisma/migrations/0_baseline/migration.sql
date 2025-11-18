@@ -1,0 +1,2 @@
+-- Baseline migration
+-- Existing migrations: 20251113124436_init, 20251113132957_add_profile_fields
