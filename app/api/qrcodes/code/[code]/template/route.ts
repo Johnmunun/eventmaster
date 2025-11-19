@@ -16,6 +16,7 @@ export async function GET(
         id: true,
         templateData: true,
         type: true,
+        data: true, // Inclure les données du QR code (contient originalData, url, etc.)
       },
     })
 
@@ -24,6 +25,18 @@ export async function GET(
         { success: false, error: "QR code introuvable" },
         { status: 404 }
       )
+    }
+
+    // Parser les données du QR code
+    let qrCodeData: any = {}
+    if (qrCode.data) {
+      try {
+        qrCodeData = typeof qrCode.data === 'string' 
+          ? JSON.parse(qrCode.data) 
+          : qrCode.data
+      } catch (e) {
+        console.error("Erreur parsing qrCode.data:", e)
+      }
     }
 
     // Parser les données du template si présentes
@@ -40,6 +53,8 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+      qrCodeType: qrCode.type,
+      qrCodeData: qrCodeData, // Contient originalData, url, etc.
       templateData: templateData || {
         type: qrCode.type,
         globalConfig: {},

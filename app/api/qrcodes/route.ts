@@ -5,7 +5,7 @@ import { z } from "zod"
 import { Prisma } from "@prisma/client"
 import QRCode from "qrcode"
 import crypto from "crypto"
-import { uploadToImageKit } from "@/lib/imagekit"
+import { uploadToImageKit, deleteFromImageKit } from "@/lib/imagekit"
 
 const createQRCodeSchema = z.object({
   name: z.string().min(1, "Le nom est requis").max(100, "Le nom est trop long"),
@@ -359,6 +359,118 @@ export async function GET(request: NextRequest) {
     console.error("Erreur lors de la récupération des QR codes:", error)
     return NextResponse.json(
       { success: false, error: "Une erreur est survenue" },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Supprimer plusieurs QR codes
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await auth()
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Non authentifié" },
+        { status: 401 }
+      )
+    }
+
+    const userId = session.user.id
+    const { searchParams } = new URL(request.url)
+    const idsParam = searchParams.get('ids')
+    
+    if (!idsParam) {
+      return NextResponse.json(
+        { success: false, error: "Aucun ID fourni" },
+        { status: 400 }
+      )
+    }
+
+    const ids = idsParam.split(',').filter(id => id.trim())
+    
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Aucun ID valide fourni" },
+        { status: 400 }
+      )
+    }
+
+    // Vérifier que tous les QR codes appartiennent à l'utilisateur
+    const qrCodes = await db.qrCode.findMany({
+      where: {
+        id: { in: ids },
+        userId: userId,
+      },
+      select: {
+        id: true,
+        data: true,
+      }
+    })
+
+    if (qrCodes.length !== ids.length) {
+      return NextResponse.json(
+        { success: false, error: "Certains QR codes n'existent pas ou ne vous appartiennent pas" },
+        { status: 403 }
+      )
+    }
+
+    // Supprimer tous les fichiers associés sur ImageKit pour chaque QR code
+    for (const qrCode of qrCodes) {
+      const qrData = qrCode.data as any
+      const templateData = qrCode.templateData as any
+      
+      // Liste des IDs de fichiers à supprimer pour ce QR code
+      const fileIdsToDelete: string[] = []
+      
+      // Supprimer l'image principale du QR code
+      if (qrData?.imageKitFileId) {
+        fileIdsToDelete.push(qrData.imageKitFileId)
+      }
+      
+      // Supprimer le logo si présent
+      if (qrData?.logoFileId) {
+        fileIdsToDelete.push(qrData.logoFileId)
+      }
+      
+      // Supprimer les fichiers depuis templateData
+      if (templateData?.uploadedFileIds && Array.isArray(templateData.uploadedFileIds)) {
+        templateData.uploadedFileIds.forEach((fileInfo: { fileId: string }) => {
+          if (fileInfo.fileId && !fileIdsToDelete.includes(fileInfo.fileId)) {
+            fileIdsToDelete.push(fileInfo.fileId)
+          }
+        })
+      }
+      
+      // Supprimer tous les fichiers ImageKit pour ce QR code
+      for (const fileId of fileIdsToDelete) {
+        try {
+          await deleteFromImageKit(fileId)
+        } catch (error) {
+          console.error(`Erreur lors de la suppression ImageKit pour ${fileId}:`, error)
+          // On continue même si la suppression ImageKit échoue
+        }
+      }
+    }
+
+    // Supprimer les QR codes
+    await db.qrCode.deleteMany({
+      where: {
+        id: { in: ids },
+        userId: userId,
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: `${qrCodes.length} QR code(s) supprimé(s) avec succès`,
+      deletedCount: qrCodes.length
+    }, { status: 200 })
+
+  } catch (error) {
+    console.error("Erreur lors de la suppression multiple des QR codes:", error)
+    return NextResponse.json(
+      { success: false, error: "Une erreur est survenue lors de la suppression" },
       { status: 500 }
     )
   }

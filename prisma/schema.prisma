@@ -228,4 +228,5 @@ enum QrCodeType {
   GALLERY
   FEEDBACK
   LIVE_STREAM
+      
 }

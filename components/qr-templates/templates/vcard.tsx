@@ -1,7 +1,7 @@
 "use client"
 
 import { useQRTemplateStore, VCardData } from "@/lib/stores/qr-template-store"
-import { Phone, Mail, MapPin, User } from "lucide-react"
+import { Phone, Mail, MapPin, User, Globe, Briefcase } from "lucide-react"
 import { getTypographyStyle } from "../utils/font-utils"
 import { getImageBorderStyle } from "../utils/image-utils"
 
@@ -13,73 +13,85 @@ export function VCardTemplate() {
   const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || "Nom complet"
 
   // Dégradé par défaut (teal/vert clair vers bleu) ou couleur personnalisée
-  const defaultGradient = 'linear-gradient(to bottom, #7DD3FC 0%, #3B82F6 100%)'
+  const primaryColor = globalConfig.primaryColor || '#3B82F6'
+  const secondaryColor = globalConfig.secondaryColor || '#7DD3FC'
+  const defaultGradient = `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 50%, ${secondaryColor} 100%)`
   const backgroundStyle = globalConfig.backgroundColor 
     ? { backgroundColor: globalConfig.backgroundColor }
     : { background: defaultGradient }
 
   // Couleur pour les icônes (bleu clair)
-  const iconBgColor = '#93C5FD'
+  const iconBgColor = 'rgba(255, 255, 255, 0.25)'
 
   return (
     <div 
-      className="w-full min-h-full flex flex-col"
+      className="w-full min-h-full flex flex-col relative overflow-hidden"
       style={{ 
         ...backgroundStyle, 
         color: '#FFFFFF',
         ...typographyStyle 
       }}
     >
+      {/* Effet de brillance animé */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-white rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      </div>
+
       {/* Contenu principal */}
-      <div className="flex-1 flex flex-col items-center pt-12 pb-8 px-6">
-        {/* Photo de profil circulaire avec bordure blanche */}
-        <div className="mb-6">
+      <div className="flex-1 flex flex-col items-center pt-16 pb-10 px-6 relative z-10">
+        {/* Photo de profil circulaire avec effet de halo */}
+        <div className="mb-8 relative">
           {data.profileImage ? (
-            <div className="relative">
+            <>
+              <div className="absolute inset-0 bg-white/30 rounded-full blur-2xl scale-125"></div>
               <img 
                 src={data.profileImage} 
                 alt="Profile" 
-                className="w-28 h-28 rounded-full border-2 border-white object-cover shadow-lg"
+                className="relative w-36 h-36 rounded-full border-4 border-white/50 object-cover shadow-2xl"
                 style={getImageBorderStyle(globalConfig).style}
               />
-            </div>
+            </>
           ) : (
-            <div className="w-28 h-28 rounded-full bg-white/20 border-2 border-white flex items-center justify-center shadow-lg">
-              <User className="w-14 h-14 text-white/80" />
+            <div className="relative w-36 h-36 rounded-full bg-white/20 border-4 border-white/50 flex items-center justify-center shadow-2xl backdrop-blur-sm">
+              <User className="w-18 h-18 text-white/80" />
             </div>
           )}
         </div>
 
         {/* Nom */}
-        <h1 className="text-2xl font-bold text-center mb-2 text-white" style={typographyStyle}>
+        <h1 className="text-3xl font-bold text-center mb-3 text-white drop-shadow-lg" style={typographyStyle}>
           {fullName}
         </h1>
 
         {/* Titre/Poste */}
         {data.jobTitle && (
-          <p className="text-base text-center text-white/90 mb-8" style={typographyStyle}>
-            {data.jobTitle}
-          </p>
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <Briefcase className="w-4 h-4 text-white/80" />
+            <p className="text-base text-center text-white/95 font-medium" style={typographyStyle}>
+              {data.jobTitle}
+            </p>
+          </div>
         )}
 
-        {/* Icônes de contact circulaires */}
-        <div className="flex items-center justify-center gap-4 mb-8">
+        {/* Icônes de contact circulaires avec design moderne */}
+        <div className="flex items-center justify-center gap-5 mb-10">
           {data.phone && (
             <a
               href={`tel:${data.phone}`}
-              className="w-14 h-14 rounded-full border-2 border-white flex items-center justify-center transition-all active:scale-95"
+              className="w-16 h-16 rounded-full border-2 border-white/40 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white/30 active:scale-95 shadow-xl backdrop-blur-md"
               style={{ backgroundColor: iconBgColor }}
             >
-              <Phone className="w-6 h-6 text-white" />
+              <Phone className="w-7 h-7 text-white" />
             </a>
           )}
           {data.email && (
             <a
               href={`mailto:${data.email}`}
-              className="w-14 h-14 rounded-full border-2 border-white flex items-center justify-center transition-all active:scale-95"
+              className="w-16 h-16 rounded-full border-2 border-white/40 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white/30 active:scale-95 shadow-xl backdrop-blur-md"
               style={{ backgroundColor: iconBgColor }}
             >
-              <Mail className="w-6 h-6 text-white" />
+              <Mail className="w-7 h-7 text-white" />
             </a>
           )}
           {data.website && (
@@ -87,33 +99,41 @@ export function VCardTemplate() {
               href={data.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-14 h-14 rounded-full border-2 border-white flex items-center justify-center transition-all active:scale-95"
+              className="w-16 h-16 rounded-full border-2 border-white/40 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white/30 active:scale-95 shadow-xl backdrop-blur-md"
               style={{ backgroundColor: iconBgColor }}
             >
-              <MapPin className="w-6 h-6 text-white" />
+              <Globe className="w-7 h-7 text-white" />
             </a>
           )}
         </div>
 
-        {/* Description */}
+        {/* Description avec card moderne */}
         {data.description && (
-          <p className="text-sm text-center text-white/90 mb-8 px-4 leading-relaxed" style={typographyStyle}>
-            {data.description}
-          </p>
+          <div className="w-full max-w-sm mb-8 bg-white/15 backdrop-blur-md rounded-2xl p-5 border border-white/20 shadow-lg">
+            <p className="text-sm text-center text-white/95 leading-relaxed" style={typographyStyle}>
+              {data.description}
+            </p>
+          </div>
         )}
 
-        {/* Section téléphone en bas */}
+        {/* Section téléphone en bas avec design moderne */}
         {data.phone && (
-          <div className="w-full max-w-sm mt-auto">
-            <div className="flex items-center gap-3 mb-2">
-              <Phone className="w-5 h-5 text-white/80" />
-              <span className="text-xs text-white/80 uppercase tracking-wide" style={typographyStyle}>
+          <div className="w-full max-w-sm mt-auto bg-white/15 backdrop-blur-md rounded-2xl p-5 border border-white/20 shadow-lg">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <Phone className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs text-white/90 uppercase tracking-wide font-semibold" style={typographyStyle}>
                 Téléphone
               </span>
             </div>
-            <p className="text-lg font-semibold text-white" style={typographyStyle}>
+            <a 
+              href={`tel:${data.phone}`}
+              className="text-xl font-bold text-white block hover:opacity-80 transition-opacity" 
+              style={typographyStyle}
+            >
               {data.phone}
-            </p>
+            </a>
           </div>
         )}
       </div>

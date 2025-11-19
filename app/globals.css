@@ -93,49 +93,18 @@
   background-clip: padding-box;
 }
 
-/* Scrollbar auto-hide pour le téléphone mockup */
-.phone-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.3s ease-in-out;
+/* Scrollbar personnalisé en overlay pour le téléphone mockup - ne prend aucun espace */
+.custom-scrollbar-overlay {
+  /* Masquer complètement le scrollbar natif */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE et Edge */
 }
 
-.phone-scrollbar-visible {
-  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
-}
-
-.phone-scrollbar-hidden {
-  scrollbar-color: transparent transparent;
-}
-
-.phone-scrollbar::-webkit-scrollbar {
-  width: 10px;
-  transition: opacity 0.3s ease-in-out;
-}
-
-.phone-scrollbar::-webkit-scrollbar-track {
+.custom-scrollbar-overlay::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
   background: transparent;
-  border-radius: 10px;
-}
-
-.phone-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 10px;
-  min-height: 20px;
-  max-height: 20px;
-  transition: background 0.3s ease-in-out, opacity 0.3s ease-in-out;
-}
-
-.phone-scrollbar-visible::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.3);
-}
-
-.phone-scrollbar-hidden::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
-.phone-scrollbar-visible::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.5);
 }
 
 /* Animation pour le menu bulle */

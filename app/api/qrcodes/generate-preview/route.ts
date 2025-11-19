@@ -62,8 +62,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("Génération QR avec options:", { color, backgroundColor, pixelShape })
-    let qrCodeDataUrl = await QRCode.toDataURL(data, qrCodeOptions)
-    console.log("QR code généré avec succès")
+    let qrCodeDataUrl: string
+    try {
+      // @ts-ignore - QRCode.toDataURL retourne bien une Promise<string>
+      const result: string = await QRCode.toDataURL(data, qrCodeOptions)
+      qrCodeDataUrl = result
+      console.log("QR code généré avec succès")
+    } catch (qrError) {
+      console.error("Erreur génération QR code:", qrError)
+      return NextResponse.json(
+        { success: false, error: "Impossible de générer le QR code" },
+        { status: 500 }
+      )
+    }
 
     // Si un logo est fourni, le superposer au centre du QR code
     if (logoBase64) {

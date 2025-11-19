@@ -306,6 +306,47 @@ export default function QRCodesPage() {
     }
   }
 
+  const handleDeleteMultipleQRCodes = async () => {
+    if (selectedQRCodes.size === 0) {
+      return
+    }
+
+    const count = selectedQRCodes.size
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} QR code(s) ? Cette action est irréversible.`)) {
+      return
+    }
+
+    try {
+      const ids = Array.from(selectedQRCodes).join(',')
+      const response = await fetch(`/api/qrcodes?ids=${ids}`, {
+        method: "DELETE",
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        toast.error("Erreur", {
+          description: data.error || "Impossible de supprimer les QR codes",
+        })
+        return
+      }
+
+      toast.success("QR Codes supprimés", {
+        description: `${data.deletedCount || count} QR code(s) supprimé(s) avec succès`,
+      })
+
+      // Réinitialiser la sélection et recharger les QR codes
+      setSelectedQRCodes(new Set())
+      fetchQRCodes()
+      fetchFolders() // Mettre à jour les compteurs
+    } catch (error) {
+      console.error("Erreur lors de la suppression multiple:", error)
+      toast.error("Erreur", {
+        description: "Une erreur est survenue lors de la suppression",
+      })
+    }
+  }
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case "GUEST":
@@ -682,9 +723,9 @@ export default function QRCodesPage() {
         </CardContent>
       </Card>
 
-      {/* Checkbox Tout sélectionner */}
+      {/* Checkbox Tout sélectionner et Suppression multiple */}
       {qrcodes.length > 0 && (
-        <div className="flex items-center gap-2 py-2">
+        <div className="flex items-center justify-between gap-2 py-2">
           <Button
             variant="ghost"
             size="sm"
@@ -704,6 +745,18 @@ export default function QRCodesPage() {
             )}
             Tout sélectionner
           </Button>
+          
+          {selectedQRCodes.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteMultipleQRCodes}
+              className="h-8 px-3"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer ({selectedQRCodes.size})
+            </Button>
+          )}
         </div>
       )}
 

@@ -37,13 +37,44 @@ export async function DELETE(
       )
     }
 
-    // Supprimer l'image d'ImageKit si elle existe
+    // Supprimer tous les fichiers associés sur ImageKit
     const qrData = existingQRCode.data as any
+    const templateData = existingQRCode.templateData as any
+    
+    // Liste des IDs de fichiers à supprimer
+    const fileIdsToDelete: string[] = []
+    
+    // Supprimer l'image principale du QR code
     if (qrData?.imageKitFileId) {
+      fileIdsToDelete.push(qrData.imageKitFileId)
+    }
+    
+    // Supprimer le logo si présent
+    if (qrData?.logoFileId) {
+      fileIdsToDelete.push(qrData.logoFileId)
+    }
+    
+    // Supprimer les fichiers depuis templateData (logos, coverImages, etc.)
+    if (templateData?.uploadedFileIds && Array.isArray(templateData.uploadedFileIds)) {
+      templateData.uploadedFileIds.forEach((fileInfo: { fileId: string }) => {
+        if (fileInfo.fileId && !fileIdsToDelete.includes(fileInfo.fileId)) {
+          fileIdsToDelete.push(fileInfo.fileId)
+        }
+      })
+    }
+    
+    // Supprimer aussi depuis globalConfig si présent
+    if (templateData?.globalConfig) {
+      // Les URLs sont dans globalConfig mais on a besoin des IDs
+      // On peut essayer de supprimer par URL si ImageKit le supporte
+    }
+    
+    // Supprimer tous les fichiers ImageKit
+    for (const fileId of fileIdsToDelete) {
       try {
-        await deleteFromImageKit(qrData.imageKitFileId)
+        await deleteFromImageKit(fileId)
       } catch (error) {
-        console.error("Erreur lors de la suppression ImageKit:", error)
+        console.error(`Erreur lors de la suppression ImageKit pour ${fileId}:`, error)
         // On continue même si la suppression ImageKit échoue
       }
     }

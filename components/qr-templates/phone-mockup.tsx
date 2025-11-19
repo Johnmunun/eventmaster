@@ -12,15 +12,33 @@ interface PhoneMockupProps {
 
 export function PhoneMockup({ children, className = "", width = 280, height = 560 }: PhoneMockupProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollbarRef = useRef<HTMLDivElement>(null)
   const [isScrolling, setIsScrolling] = useState(false)
+  const [scrollProgress, setScrollProgress] = useState(0)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const container = scrollContainerRef.current
-    if (!container) return
+    const scrollbar = scrollbarRef.current
+    if (!container || !scrollbar) return
+
+    const updateScrollbar = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const maxScroll = scrollHeight - clientHeight
+      const progress = maxScroll > 0 ? scrollTop / maxScroll : 0
+      setScrollProgress(progress)
+      
+      // Calculer la hauteur et la position du thumb
+      const thumbHeight = Math.max(20, (clientHeight / scrollHeight) * clientHeight)
+      const thumbTop = progress * (clientHeight - thumbHeight)
+      
+      scrollbar.style.setProperty('--thumb-height', `${thumbHeight}px`)
+      scrollbar.style.setProperty('--thumb-top', `${thumbTop}px`)
+    }
 
     const handleScroll = () => {
       setIsScrolling(true)
+      updateScrollbar()
       
       // Réinitialiser le timeout
       if (scrollTimeoutRef.current) {
@@ -33,10 +51,39 @@ export function PhoneMockup({ children, className = "", width = 280, height = 56
       }, 2000)
     }
 
+    // Observer les changements de taille
+    const resizeObserver = new ResizeObserver(() => {
+      updateScrollbar()
+    })
+    resizeObserver.observe(container)
+
+    // Gérer le scroll (souris, touch, clavier)
     container.addEventListener('scroll', handleScroll)
+    
+    // Gérer les touches du clavier (flèches haut/bas, page up/down, etc.)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) {
+        // Le scroll sera géré par le navigateur, on met juste à jour le scrollbar
+        setTimeout(() => {
+          updateScrollbar()
+          setIsScrolling(true)
+          if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current)
+          }
+          scrollTimeoutRef.current = setTimeout(() => {
+            setIsScrolling(false)
+          }, 2000)
+        }, 10)
+      }
+    }
+    
+    container.addEventListener('keydown', handleKeyDown)
+    updateScrollbar()
     
     return () => {
       container.removeEventListener('scroll', handleScroll)
+      container.removeEventListener('keydown', handleKeyDown)
+      resizeObserver.disconnect()
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current)
       }
@@ -66,18 +113,50 @@ export function PhoneMockup({ children, className = "", width = 280, height = 56
           </div>
         </div>
         
-        {/* Contenu de l'écran - Scrollable avec scrollbar auto-hide */}
-        <div 
-          ref={scrollContainerRef}
-          className={`pt-8 h-full overflow-y-auto overflow-x-hidden phone-scrollbar ${isScrolling ? 'phone-scrollbar-visible' : 'phone-scrollbar-hidden'}`}
-          style={{ 
-            scrollbarWidth: 'thin', 
-            scrollbarColor: isScrolling ? 'rgba(156, 163, 175, 0.6) transparent' : 'transparent transparent',
-            maxHeight: 'calc(100% - 2rem)'
-          }}
-        >
-          <div className="w-full min-h-full">
-            {children}
+        {/* Contenu de l'écran - Scrollable avec scrollbar personnalisé en overlay */}
+        <div className="relative pt-8 h-full overflow-hidden">
+          <div 
+            ref={scrollContainerRef}
+            className="h-full overflow-y-scroll overflow-x-hidden custom-scrollbar-overlay"
+            tabIndex={0} // Permettre le focus pour les touches du clavier
+            style={{ 
+              scrollbarWidth: 'none', // Masquer le scrollbar natif
+              msOverflowStyle: 'none', // Masquer pour IE/Edge
+              maxHeight: 'calc(100% - 2rem)',
+              outline: 'none' // Pas de contour de focus visible
+            }}
+          >
+            <div 
+              className="w-full min-h-full" 
+              style={{ 
+                width: '100%', 
+                maxWidth: '100%', 
+                boxSizing: 'border-box'
+              }}
+            >
+              {children}
+            </div>
+          </div>
+          
+          {/* Scrollbar personnalisé en overlay - ne prend aucun espace */}
+          <div 
+            ref={scrollbarRef}
+            className={`absolute top-8 right-0 bottom-0 w-2 pointer-events-none z-20 transition-opacity duration-300 ${
+              isScrolling ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{
+              '--thumb-height': '20px',
+              '--thumb-top': '0px'
+            } as React.CSSProperties}
+          >
+            <div 
+              className="absolute right-0 w-1 bg-gray-400/30 rounded-full transition-all duration-200"
+              style={{
+                height: 'var(--thumb-height)',
+                top: 'var(--thumb-top)',
+                minHeight: '20px'
+              }}
+            />
           </div>
         </div>
       </div>

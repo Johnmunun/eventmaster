@@ -8,6 +8,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { TemplateBuilder } from "@/components/qr-templates/template-builder"
 import { useQRTemplateStore, TemplateType } from "@/lib/stores/qr-template-store"
+import { getTemplateComponent } from "@/components/qr-templates/index"
+import { PhoneMockup } from "@/components/qr-templates/phone-mockup"
+import { QRAppearanceStep, QRAppearanceConfig } from "./qr-appearance-step"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -432,12 +435,14 @@ const customizationSchema = z.object({
 export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGeneratorDrawerProps) {
   const router = useRouter()
   const [step, setStep] = useState(1)
+  const [totalSteps, setTotalSteps] = useState(3) // 3 étapes : type+contenu -> template -> apparence
   const [selectedType, setSelectedType] = useState<QRType | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [useTemplateSystem, setUseTemplateSystem] = useState(false)
   const [qrPreview, setQrPreview] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [qrCodeData, setQrCodeData] = useState<string>("") // Données pour l'étape d'apparence
+  const [appearanceConfig, setAppearanceConfig] = useState<QRAppearanceConfig | null>(null)
   const [landingPageConfig, setLandingPageConfig] = useState({
     backgroundColor: "#527AC9",
     textColor: "#FFFFFF",
@@ -519,9 +524,11 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
   useEffect(() => {
     if (!open) {
       setStep(1)
+      setTotalSteps(3)
       setSelectedType(null)
       setQrPreview(null)
       setLogoPreview(null)
+      setQrCodeData("")
       contentForm.reset()
       customizationForm.reset()
     }
@@ -683,7 +690,10 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         break
     }
 
-    if (!qrData) return
+    if (!qrData || qrData.trim() === "") {
+      console.log("qrData est vide, skip de la preview")
+      return
+    }
 
     // Valider et corriger les couleurs hexadécimales
     const isValidHexColor = (color: string): boolean => {
@@ -702,7 +712,7 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       backgroundColor = "#FFFFFF"
     }
 
-    console.log("Génération preview avec:", { color, backgroundColor, pixelShape, hasLogo: !!logoPreview })
+    console.log("Génération preview avec:", { color, backgroundColor, pixelShape, hasLogo: !!logoPreview, qrDataLength: qrData.length })
 
     // Générer le QR code avec les options de personnalisation
     try {
@@ -718,12 +728,21 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         }),
       })
 
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Erreur API generate-preview:", response.status, errorText)
+        return
+      }
+
       const result = await response.json()
       if (result.success) {
         setQrPreview(result.imageUrl)
+      } else {
+        console.error("Erreur dans la réponse:", result.error)
       }
     } catch (error) {
       console.error("Erreur lors de la génération de la preview:", error)
+      // Ne pas bloquer l'interface si la preview échoue
     }
   }, [selectedType, contentForm, customizationForm, logoPreview])
 
@@ -784,19 +803,16 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
 
   const { setSelectedTemplate: setTemplateType } = useQRTemplateStore()
 
-  const handleTypeSelect = (type: QRType) => {
+  const handleTypeSelect = async (type: QRType) => {
     setSelectedType(type)
     
-    // Vérifier si un template existe pour ce type
+    // TOUS les types utilisent le système de template
     const templateType = getTemplateForQRType(type)
     if (templateType) {
-      // Basculer automatiquement vers le mode template
-      setUseTemplateSystem(true)
       setTemplateType(templateType)
     } else {
-      // Mode classique
-      setUseTemplateSystem(false)
-      setTemplateType(null)
+      // Si aucun template spécifique, utiliser linkpage par défaut
+      setTemplateType("linkpage")
     }
     
     // Initialiser les valeurs par défaut selon le type
@@ -809,6 +825,12 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       defaultValues.questions = [{ question: "", type: "rating" }]
     }
     contentForm.reset(defaultValues)
+    
+    // Passer automatiquement à l'étape 2 (TemplateBuilder) après la sélection
+    // Attendre un peu pour que le state soit mis à jour
+    setTimeout(() => {
+      setStep(2)
+    }, 100)
   }
 
   const handleNext = async () => {
@@ -817,12 +839,23 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         toast.error("Veuillez sélectionner un type de QR code")
         return
       }
+      // Validation du formulaire de contenu
+      const isValid = await contentForm.trigger()
+      if (!isValid) {
+        toast.error("Erreur de validation", {
+          description: "Veuillez remplir tous les champs requis correctement."
+        })
+        return
+      }
+      // Passer directement à l'étape 2 (template)
       setStep(2)
     } else if (step === 2) {
-      const isValid = await contentForm.trigger()
-      if (isValid) {
-        setStep(3)
-      }
+      // Étape 2 (template) : passer à l'étape 3 (apparence)
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://mon-site-web'
+      const qrCodeId = `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const qrUrl = `${baseUrl}/qr/${qrCodeId}`
+      setQrCodeData(qrUrl)
+      setStep(3)
     }
   }
 
@@ -832,191 +865,257 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
     }
   }
 
-  const handleSubmit = async () => {
-    const isContentValid = await contentForm.trigger()
-    const isCustomValid = await customizationForm.trigger()
-
-    if (!isContentValid || !isCustomValid) {
-      toast.error("Veuillez remplir tous les champs requis")
-      return
-    }
-
+  const handleSubmitWithAppearance = async (qrCodeImage: string, appearanceConfig: QRAppearanceConfig) => {
     setIsSubmitting(true)
-
     try {
       const contentData = contentForm.getValues()
       const customData = customizationForm.getValues()
+      
+      // Debug: Log des données récupérées
+      console.log("handleSubmitWithAppearance - Données récupérées:", {
+        selectedType,
+        contentData,
+        customData,
+        formErrors: contentForm.formState.errors
+      })
+      
+      // Validation manuelle pour certains types critiques (toujours valider)
+      if (selectedType) {
+        // Valider manuellement les champs requis selon le type
+        let hasErrors = false
+        let errorMessage = ""
+        
+        switch (selectedType) {
+          case "URL":
+            if (!contentData.url || !contentData.url.trim()) {
+              hasErrors = true
+              errorMessage = "L'URL est requise"
+            }
+            break
+          case "TEXT":
+            if (!contentData.text || !contentData.text.trim()) {
+              hasErrors = true
+              errorMessage = "Le texte est requis"
+            }
+            break
+          case "VIDEO":
+            if (!contentData.videoUrl || !contentData.videoUrl.trim()) {
+              hasErrors = true
+              errorMessage = "L'URL de la vidéo est requise"
+            }
+            break
+          case "PDF":
+            if (!contentData.pdfFile) {
+              hasErrors = true
+              errorMessage = "Le fichier PDF est requis"
+            }
+            break
+          case "IMAGE":
+            if (!contentData.images || contentData.images.length === 0) {
+              hasErrors = true
+              errorMessage = "Au moins une image est requise"
+            }
+            break
+          case "WHATSAPP":
+            if (!contentData.phone || !contentData.phone.trim()) {
+              hasErrors = true
+              errorMessage = "Le numéro de téléphone est requis"
+            }
+            break
+          case "WIFI":
+            if (!contentData.ssid || !contentData.ssid.trim()) {
+              hasErrors = true
+              errorMessage = "Le nom du réseau Wi-Fi est requis"
+            }
+            break
+          case "EMAIL":
+            if (!contentData.email || !contentData.email.trim()) {
+              hasErrors = true
+              errorMessage = "L'adresse email est requise"
+            }
+            break
+          case "PHONE":
+            if (!contentData.phone || !contentData.phone.trim()) {
+              hasErrors = true
+              errorMessage = "Le numéro de téléphone est requis"
+            }
+            break
+          case "SMS":
+            if (!contentData.phone || !contentData.phone.trim()) {
+              hasErrors = true
+              errorMessage = "Le numéro de téléphone est requis"
+            }
+            break
+          case "LOCATION":
+            if (!contentData.latitude || !contentData.longitude) {
+              hasErrors = true
+              errorMessage = "Les coordonnées GPS sont requises"
+            }
+            break
+          case "BITCOIN":
+            if (!contentData.address || !contentData.address.trim()) {
+              hasErrors = true
+              errorMessage = "L'adresse Bitcoin est requise"
+            }
+            break
+          case "PLAYLIST":
+            // Pour PLAYLIST, seul le titre est requis, l'URL est optionnelle
+            if (!contentData.title || !contentData.title.trim()) {
+              hasErrors = true
+              errorMessage = "Le titre de la playlist est requis"
+            }
+            break
+          case "LIVE_STREAM":
+            if (!contentData.url || !contentData.url.trim()) {
+              hasErrors = true
+              errorMessage = "L'URL du stream est requise"
+            }
+            break
+          case "EVENTBRITE":
+            if (!contentData.url || !contentData.url.trim()) {
+              hasErrors = true
+              errorMessage = "L'URL Eventbrite est requise"
+            }
+            break
+          case "SOCIAL":
+            if (!contentData.platform || !contentData.username || !contentData.username.trim()) {
+              hasErrors = true
+              errorMessage = "Le réseau social et le nom d'utilisateur sont requis"
+            }
+            break
+          // Les types suivants utilisent le système de template et ne nécessitent pas de validation stricte ici
+          // GALLERY, PROGRAM, FEEDBACK, COUPON, MENU, VCARD sont gérés par leur schéma Zod
+        }
+        
+        if (hasErrors) {
+          toast.error("Erreur", {
+            description: errorMessage,
+          })
+          setIsSubmitting(false)
+          return
+        }
+      }
 
-      // Préparer les données selon le type
+      // TOUJOURS récupérer les données du template depuis le store
+      const { exportToJSON } = useQRTemplateStore.getState()
+      let templateDataToSave = exportToJSON()
+
+      // Utiliser l'URL qui a été générée pour l'aperçu (qrCodeData)
+      // Cette URL sera mise à jour côté serveur avec le vrai code
+      const qrUrl = qrCodeData || (() => {
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://mon-site-web'
+        const tempCode = `temp_${Date.now()}`
+        return `${baseUrl}/qr/${tempCode}`
+      })()
+
+      // Préparer les données selon le type pour sauvegarder dans la DB
+      // TOUJOURS utiliser le système de template
       let qrData = ""
       const formData = new FormData()
 
-      switch (selectedType) {
-        case "URL":
-          qrData = contentData.url
-          break
-        case "PDF":
-          formData.append("pdfFile", contentData.pdfFile)
-          qrData = "PDF_FILE" // Sera remplacé par l'URL après upload
-          break
-        case "IMAGE":
-          contentData.images.forEach((img: File) => {
-            formData.append("images", img)
-          })
-          qrData = "IMAGES_FILES" // Sera remplacé par l'URL après upload
-          break
-        case "VIDEO":
-          qrData = contentData.videoUrl
-          break
-        case "TEXT":
-          qrData = contentData.text
-          break
-        case "GUEST_CARD":
-          qrData = JSON.stringify({
-            firstName: contentData.firstName,
-            lastName: contentData.lastName,
-            table: contentData.table,
-          })
-          break
-        case "WHATSAPP":
-          const whatsappMessage = contentData.message ? encodeURIComponent(contentData.message) : ""
-          qrData = `https://wa.me/${contentData.phone.replace(/\D/g, "")}${whatsappMessage ? `?text=${whatsappMessage}` : ""}`
-          break
-        case "SOCIAL":
-          const socialUrls: Record<string, string> = {
-            facebook: `https://facebook.com/${contentData.username}`,
-            instagram: `https://instagram.com/${contentData.username}`,
-            twitter: `https://twitter.com/${contentData.username}`,
-            linkedin: `https://linkedin.com/in/${contentData.username}`,
-            youtube: `https://youtube.com/@${contentData.username}`,
-            tiktok: `https://tiktok.com/@${contentData.username}`,
-          }
-          qrData = socialUrls[contentData.platform] || ""
-          break
-        case "MENU":
-          // Pour le menu, on encode les données JSON et on génère une URL
-          qrData = JSON.stringify({
-            type: "menu",
-            title: contentData.title,
-            items: contentData.items || [],
-          })
-          break
-        case "WIFI":
-          // Format Wi-Fi: WIFI:T:WPA2;S:SSID;P:Password;;
-          const security = contentData.security || "WPA2"
-          const ssid = contentData.ssid || ""
-          const password = contentData.password || ""
-          qrData = `WIFI:T:${security};S:${ssid};P:${password};;`
-          break
-        case "PROGRAM":
-          // Pour le programme, on encode les données JSON
-          qrData = JSON.stringify({
-            type: "program",
-            title: contentData.title,
-            events: contentData.events || [],
-          })
-          break
-        case "VCARD":
-          // Format vCard
-          const vcard = [
-            "BEGIN:VCARD",
-            "VERSION:3.0",
-            `FN:${contentData.firstName || ""} ${contentData.lastName || ""}`,
-            `N:${contentData.lastName || ""};${contentData.firstName || ""};;;`,
-            contentData.organization ? `ORG:${contentData.organization}` : "",
-            contentData.title ? `TITLE:${contentData.title}` : "",
-            contentData.email ? `EMAIL:${contentData.email}` : "",
-            contentData.phone ? `TEL:${contentData.phone}` : "",
-            contentData.website ? `URL:${contentData.website}` : "",
-            contentData.address ? `ADR:;;${contentData.address};;;;` : "",
-            "END:VCARD"
-          ].filter(Boolean).join("\n")
-          qrData = vcard
-          break
-        case "COUPON":
-          // Pour le coupon, on encode les données JSON
-          qrData = JSON.stringify({
-            type: "coupon",
-            code: contentData.code,
-            discount: contentData.discount,
-            discountType: contentData.type,
-            expiresAt: contentData.expiresAt,
-            description: contentData.description,
-          })
-          break
-        case "PLAYLIST":
-          qrData = contentData.url || ""
-          break
-        case "GALLERY":
-          // Pour la galerie, on encode les données JSON
-          qrData = JSON.stringify({
-            type: "gallery",
-            title: contentData.title,
-            allowUpload: contentData.allowUpload,
-          })
-          break
-        case "FEEDBACK":
-          // Pour le feedback, on encode les données JSON
-          qrData = JSON.stringify({
-            type: "feedback",
-            title: contentData.title,
-            questions: contentData.questions || [],
-          })
-          break
-        case "LIVE_STREAM":
-          qrData = contentData.url || ""
-          break
-        case "EMAIL":
-          // Format mailto: avec sujet et corps
-          const emailParams = new URLSearchParams()
-          if (contentData.subject) emailParams.append("subject", contentData.subject)
-          if (contentData.body) emailParams.append("body", contentData.body)
-          const emailQuery = emailParams.toString()
-          qrData = `mailto:${contentData.email}${emailQuery ? `?${emailQuery}` : ""}`
-          break
-        case "SMS":
-          // Format sms: avec message
-          const smsMessage = contentData.message ? encodeURIComponent(contentData.message) : ""
-          qrData = `sms:${contentData.phone.replace(/\D/g, "")}${smsMessage ? `?body=${smsMessage}` : ""}`
-          break
-        case "LOCATION":
-          // Format geo: pour les coordonnées GPS
-          const lat = contentData.latitude
-          const lon = contentData.longitude
-          const geoName = contentData.name ? encodeURIComponent(contentData.name) : ""
-          qrData = `geo:${lat},${lon}${geoName ? `?q=${geoName}` : ""}`
-          break
-        case "PHONE":
-          // Format tel: pour les numéros de téléphone
-          qrData = `tel:${contentData.phone.replace(/\D/g, "")}`
-          break
-        case "BITCOIN":
-          // Format bitcoin: pour les adresses Bitcoin
-          const btcParams = new URLSearchParams()
-          if (contentData.amount) btcParams.append("amount", contentData.amount)
-          if (contentData.label) btcParams.append("label", contentData.label)
-          if (contentData.message) btcParams.append("message", contentData.message)
-          const btcQuery = btcParams.toString()
-          qrData = `bitcoin:${contentData.address}${btcQuery ? `?${btcQuery}` : ""}`
-          break
-        case "EVENTBRITE":
-          qrData = contentData.url || ""
-          break
+      // Intégrer les données de contenu dans le templateData si nécessaire
+      if (templateDataToSave && selectedType) {
+        // Mettre à jour templateData avec les données du formulaire de contenu
+        if (!templateDataToSave.templateData) {
+          templateDataToSave.templateData = {}
+        }
+        
+        // Ajouter les données spécifiques selon le type
+        switch (selectedType) {
+          case "URL":
+            templateDataToSave.templateData.url = contentData.url || ""
+            break
+          case "TEXT":
+            templateDataToSave.templateData.text = contentData.text || ""
+            break
+          case "VIDEO":
+            templateDataToSave.templateData.videoUrl = contentData.videoUrl || ""
+            break
+          case "PLAYLIST":
+            templateDataToSave.templateData.title = contentData.title || ""
+            templateDataToSave.templateData.platform = contentData.platform || ""
+            templateDataToSave.templateData.url = contentData.url || ""
+            break
+          case "GUEST_CARD":
+            templateDataToSave.templateData.firstName = contentData.firstName || ""
+            templateDataToSave.templateData.lastName = contentData.lastName || ""
+            templateDataToSave.templateData.table = contentData.table || ""
+            break
+          // Ajouter d'autres types si nécessaire
+        }
       }
 
-      // Ajouter les données de personnalisation
-      formData.append("type", selectedType!)
-      formData.append("name", customData.name)
+      // TOUJOURS utiliser le système de template
+      qrData = qrUrl // Sera remplacé par le vrai code côté serveur
+      formData.append("type", selectedType || "URL")
+      
+      // Gérer les fichiers uploadés (PDF, images) - les ajouter au formData
+      if (selectedType === "PDF" && contentData.pdfFile) {
+        formData.append("pdfFile", contentData.pdfFile)
+      }
+      if (selectedType === "IMAGE" && contentData.images && contentData.images.length > 0) {
+        contentData.images.forEach((img: File) => {
+          formData.append("images", img)
+        })
+      }
+
+      // Vérifier que qrData n'est pas vide
+      // Pour certains types (GALLERY, PROGRAM, etc.), "{}" peut être valide si les champs optionnels sont vides
+      const typesWithOptionalData = ["GALLERY", "PROGRAM", "FEEDBACK", "COUPON", "MENU"]
+      const isEmpty = !qrData || qrData.trim() === ""
+      const isOnlyEmptyJson = qrData === "{}"
+      
+      // Pour GUEST_CARD, on a déjà validé les champs, donc si qrData est "{}", c'est une erreur
+      if (selectedType === "GUEST_CARD" && isOnlyEmptyJson) {
+        console.error("GUEST_CARD - qrData est vide après validation:", {
+          qrData,
+          contentData,
+          formState: contentForm.formState
+        })
+        toast.error("Erreur", {
+          description: "Impossible de générer le QR code. Les données sont invalides.",
+        })
+        setIsSubmitting(false)
+        return
+      }
+      
+      if (isEmpty || (!typesWithOptionalData.includes(selectedType || "") && isOnlyEmptyJson)) {
+        console.error("qrData est vide ou invalide:", qrData, "Type:", selectedType, "contentData:", contentData)
+        toast.error("Erreur", {
+          description: "Les données du QR code sont invalides. Veuillez remplir tous les champs requis.",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      console.log("Envoi des données au serveur - Type:", selectedType, "qrData (premiers 100 chars):", qrData.substring(0, 100))
+
+      // Ajouter les données
+      formData.append("name", customData.name || "QR Code")
       formData.append("data", qrData)
-      formData.append("color", customData.color)
-      formData.append("backgroundColor", customData.backgroundColor)
-      formData.append("pixelShape", customData.pixelShape)
+      formData.append("color", appearanceConfig.foregroundColor)
+      formData.append("backgroundColor", appearanceConfig.backgroundColor)
+      formData.append("frameStyle", appearanceConfig.frameStyle || "")
+      formData.append("pattern", appearanceConfig.pattern)
+      formData.append("cornerStyle", appearanceConfig.cornerStyle)
+      
+      // Ajouter templateData si présent
+      if (templateDataToSave) {
+        formData.append("templateData", JSON.stringify(templateDataToSave))
+      }
+      
       if (customData.folderId) {
         formData.append("folderId", customData.folderId)
       }
-      if (customData.logoFile) {
-        formData.append("logoFile", customData.logoFile)
+      if (appearanceConfig.logo) {
+        // Convertir l'image base64 en blob
+        const response = await fetch(appearanceConfig.logo)
+        const blob = await response.blob()
+        formData.append("logoFile", blob, "logo.png")
       }
+      // Ajouter l'image du QR code généré
+      const qrImageBlob = await (await fetch(qrCodeImage)).blob()
+      formData.append("qrCodeImage", qrImageBlob, "qrcode.png")
 
       const response = await fetch("/api/qrcodes/generate", {
         method: "POST",
@@ -1045,6 +1144,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       setIsSubmitting(false)
     }
   }
+
+  // handleSubmit supprimé - remplacé par handleSubmitWithAppearance
 
   // Rendre la page de landing personnalisable dans le téléphone
   const renderLandingPage = () => {
@@ -1159,1563 +1260,552 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
     )
   }
 
-  const renderStep1 = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-      {/* Colonne gauche : Types de QR */}
-      <div className="space-y-6 order-2 lg:order-1 flex flex-col h-full min-h-0">
-        <div className="flex-shrink-0">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            1. Choisissez le type de QR code
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Sélectionnez le type de contenu que vous souhaitez encoder
-          </p>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto pr-2 drawer-scrollbar">
-          <div className="grid grid-cols-3 gap-4 pb-4">
-          {QR_TYPES.map((type) => {
-            const hasTemplate = getTemplateForQRType(type.id) !== null
-            return (
-            <Card
-              key={type.id}
-              className={`cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg ${
-                selectedType === type.id
-                  ? "ring-2 ring-primary shadow-lg"
-                  : "hover:border-primary/50"
-              }`}
-              onClick={() => handleTypeSelect(type.id)}
-            >
-              <CardContent className="p-4 flex flex-col items-center justify-center space-y-2 h-full">
-                <div
-                  className={`p-3 rounded-lg bg-gradient-to-br ${type.color} text-white shadow-md`}
-                >
-                  {type.icon}
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-sm text-gray-900 dark:text-white">
-                    {type.label}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {type.description}
-                  </p>
-                </div>
-                {selectedType === type.id && (
-                  <Badge className="mt-2 bg-primary text-white">
-                    <Check className="h-3 w-3 mr-1" />
-                    Sélectionné
-                  </Badge>
-                )}
-                {hasTemplate && (
-                  <Badge className="mt-1 bg-green-500 text-white text-xs">
-                    📱 Template
-                  </Badge>
-                )}
-              </CardContent>
-            </Card>
-            )
-          })}
-        </div>
-        </div>
-      </div>
-
-      {/* Colonne droite : Preview mobile */}
-      <div className="order-1 lg:order-2 flex items-start justify-center lg:sticky lg:top-0">
-        <div className="relative w-[280px] h-[560px] bg-gray-900 rounded-[3rem] p-2 shadow-2xl">
-          <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative">
-            {/* Barre de statut */}
-            <div className="absolute top-0 left-0 right-0 h-8 bg-gray-900 flex items-center justify-between px-6 text-white text-xs font-medium z-10">
-              <span>9:41</span>
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-2 border border-white rounded-sm">
-                  <div className="w-full h-full bg-white rounded-sm"></div>
-                </div>
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-                <div className="w-6 h-3 border border-white rounded-sm">
-                  <div className="w-4/5 h-full bg-white rounded-sm"></div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Contenu de l'écran */}
-            <div className="pt-8 h-full overflow-hidden">
-              {selectedType ? (
-                renderLandingPage()
-              ) : (
-                <div className="h-full flex items-center justify-center p-6">
-                  <div className="text-center text-gray-400">
-                    <QrCode className="h-24 w-24 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Sélectionnez un type de QR code</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gray-800 rounded-full"></div>
-        </div>
-      </div>
-    </div>
-  )
-
-  const renderStep2 = () => {
+  // Fonction pour rendre le formulaire de contenu avec design amélioré
+  const renderContentForm = () => {
     if (!selectedType) return null
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Colonne gauche : Formulaire */}
-        <div className="space-y-6 order-2 lg:order-1">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              2. Remplissez les informations
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {selectedType === "URL" && "Entrez l'URL à encoder dans le QR code"}
-              {selectedType === "PDF" && "Téléchargez votre fichier PDF (max 5Mo)"}
-              {selectedType === "IMAGE" && "Téléchargez une ou plusieurs images (max 5Mo chacune)"}
-              {selectedType === "VIDEO" && "Entrez l'URL de la vidéo (YouTube, Vimeo, etc.)"}
-              {selectedType === "TEXT" && "Entrez le texte à encoder"}
-              {selectedType === "GUEST_CARD" && "Remplissez les informations de la carte d'invité"}
-              {selectedType === "WHATSAPP" && "Entrez le numéro WhatsApp et optionnellement un message"}
-              {selectedType === "SOCIAL" && "Sélectionnez le réseau social et entrez le nom d'utilisateur"}
-              {selectedType === "MENU" && "Créez le menu du repas avec les plats et leurs informations"}
-              {selectedType === "WIFI" && "Configurez les informations de connexion Wi-Fi"}
-              {selectedType === "PROGRAM" && "Créez le programme de l'événement avec la timeline"}
-              {selectedType === "VCARD" && "Remplissez les informations de votre carte de visite"}
-              {selectedType === "COUPON" && "Créez un code promo ou une réduction"}
-              {selectedType === "PLAYLIST" && "Partagez votre playlist musicale"}
-              {selectedType === "GALLERY" && "Créez une galerie photo pour l'événement"}
-              {selectedType === "FEEDBACK" && "Créez un formulaire de satisfaction"}
-              {selectedType === "LIVE_STREAM" && "Configurez le lien de diffusion en direct"}
-            </p>
+      <div className="space-y-5">
+        {/* URL */}
+        {selectedType === "URL" && (
+          <div className="space-y-2">
+            <Label htmlFor="url" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              URL du site web
+            </Label>
+            <Input
+              id="url"
+              type="url"
+              placeholder="https://example.com"
+              className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              {...contentForm.register("url")}
+            />
+            {contentForm.formState.errors.url && (
+              <p className="text-xs text-red-500 mt-1">
+                {contentForm.formState.errors.url.message as string}
+              </p>
+            )}
           </div>
+        )}
 
-          <div className="space-y-4">
-          {selectedType === "URL" && (
-            <div>
-              <Label htmlFor="url">URL</Label>
+        {/* PDF */}
+        {selectedType === "PDF" && (
+          <div className="space-y-2">
+            <Label htmlFor="pdfFile" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Fichier PDF
+            </Label>
+            <div className="relative">
               <Input
-                id="url"
-                type="url"
-                placeholder="https://example.com"
-                {...contentForm.register("url")}
-              />
-              {contentForm.formState.errors.url && (
-                <p className="text-sm text-red-500 mt-1">
-                  {contentForm.formState.errors.url.message as string}
-                </p>
-              )}
-            </div>
-          )}
-
-          {selectedType === "PDF" && (
-            <div>
-              <Label htmlFor="pdfFile">Fichier PDF</Label>
-              <div className="mt-2">
-                <Input
-                  id="pdfFile"
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      if (file.size > 5 * 1024 * 1024) {
-                        toast.error("Le fichier est trop volumineux (max 5Mo)")
-                        return
-                      }
-                      contentForm.setValue("pdfFile", file)
+                id="pdfFile"
+                type="file"
+                accept=".pdf"
+                className="rounded-md border-gray-300 dark:border-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Le fichier est trop volumineux (max 5Mo)")
+                      return
                     }
-                  }}
-                />
-              </div>
-              {contentForm.formState.errors.pdfFile && (
-                <p className="text-sm text-red-500 mt-1">
-                  {contentForm.formState.errors.pdfFile.message as string}
-                </p>
-              )}
-            </div>
-          )}
-
-          {selectedType === "IMAGE" && (
-            <div>
-              <Label htmlFor="images">Images</Label>
-              <div className="mt-2">
-                <Input
-                  id="images"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || [])
-                    const validFiles = files.filter((file) => {
-                      if (file.size > 5 * 1024 * 1024) {
-                        toast.error(`${file.name} est trop volumineux (max 5Mo)`)
-                        return false
-                      }
-                      return true
-                    })
-                    contentForm.setValue("images", validFiles)
-                  }}
-                />
-              </div>
-              {contentForm.formState.errors.images && (
-                <p className="text-sm text-red-500 mt-1">
-                  {contentForm.formState.errors.images.message as string}
-                </p>
-              )}
-            </div>
-          )}
-
-          {selectedType === "VIDEO" && (
-            <div>
-              <Label htmlFor="videoUrl">URL de la vidéo</Label>
-              <Input
-                id="videoUrl"
-                type="url"
-                placeholder="https://youtube.com/watch?v=..."
-                {...contentForm.register("videoUrl")}
+                    contentForm.setValue("pdfFile", file)
+                  }
+                }}
               />
-              {contentForm.formState.errors.videoUrl && (
-                <p className="text-sm text-red-500 mt-1">
-                  {contentForm.formState.errors.videoUrl.message as string}
-                </p>
-              )}
             </div>
-          )}
+            {contentForm.formState.errors.pdfFile && (
+              <p className="text-xs text-red-500 mt-1">
+                {contentForm.formState.errors.pdfFile.message as string}
+              </p>
+            )}
+          </div>
+        )}
 
-          {selectedType === "TEXT" && (
-            <div>
-              <Label htmlFor="text">Texte</Label>
-              <Textarea
-                id="text"
-                placeholder="Entrez votre texte ici..."
-                rows={6}
-                {...contentForm.register("text")}
-              />
-              {contentForm.formState.errors.text && (
-                <p className="text-sm text-red-500 mt-1">
-                  {contentForm.formState.errors.text.message as string}
-                </p>
-              )}
-            </div>
-          )}
+        {/* IMAGE */}
+        {selectedType === "IMAGE" && (
+          <div className="space-y-2">
+            <Label htmlFor="images" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Images
+            </Label>
+            <Input
+              id="images"
+              type="file"
+              accept="image/*"
+              multiple
+              className="rounded-md border-gray-300 dark:border-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || [])
+                const validFiles = files.filter((file) => {
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast.error(`${file.name} est trop volumineux (max 5Mo)`)
+                    return false
+                  }
+                  return true
+                })
+                contentForm.setValue("images", validFiles)
+              }}
+            />
+            {contentForm.formState.errors.images && (
+              <p className="text-xs text-red-500 mt-1">
+                {contentForm.formState.errors.images.message as string}
+              </p>
+            )}
+          </div>
+        )}
 
-          {selectedType === "GUEST_CARD" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="firstName">Prénom</Label>
+        {/* VIDEO */}
+        {selectedType === "VIDEO" && (
+          <div className="space-y-2">
+            <Label htmlFor="videoUrl" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              URL de la vidéo
+            </Label>
+            <Input
+              id="videoUrl"
+              type="url"
+              placeholder="https://youtube.com/watch?v=..."
+              className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              {...contentForm.register("videoUrl")}
+            />
+            {contentForm.formState.errors.videoUrl && (
+              <p className="text-xs text-red-500 mt-1">
+                {contentForm.formState.errors.videoUrl.message as string}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* TEXT */}
+        {selectedType === "TEXT" && (
+          <div className="space-y-2">
+            <Label htmlFor="text" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Texte
+            </Label>
+            <Textarea
+              id="text"
+              placeholder="Entrez votre texte ici..."
+              rows={5}
+              className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none"
+              {...contentForm.register("text")}
+            />
+            {contentForm.formState.errors.text && (
+              <p className="text-xs text-red-500 mt-1">
+                {contentForm.formState.errors.text.message as string}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* GUEST_CARD */}
+        {selectedType === "GUEST_CARD" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Prénom
+                </Label>
                 <Input
                   id="firstName"
                   placeholder="Jean"
+                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("firstName")}
                 />
                 {contentForm.formState.errors.firstName && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-xs text-red-500 mt-1">
                     {contentForm.formState.errors.firstName.message as string}
                   </p>
                 )}
               </div>
-              <div>
-                <Label htmlFor="lastName">Nom</Label>
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Nom
+                </Label>
                 <Input
                   id="lastName"
                   placeholder="Dupont"
+                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("lastName")}
                 />
                 {contentForm.formState.errors.lastName && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-xs text-red-500 mt-1">
                     {contentForm.formState.errors.lastName.message as string}
                   </p>
                 )}
               </div>
-              <div>
-                <Label htmlFor="table">Numéro de table</Label>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="table" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Numéro de table
+              </Label>
+              <Input
+                id="table"
+                placeholder="Table 12"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("table")}
+              />
+              {contentForm.formState.errors.table && (
+                <p className="text-xs text-red-500 mt-1">
+                  {contentForm.formState.errors.table.message as string}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* WHATSAPP */}
+        {selectedType === "WHATSAPP" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Numéro WhatsApp
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+33612345678"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("phone")}
+              />
+              {contentForm.formState.errors.phone && (
+                <p className="text-xs text-red-500 mt-1">
+                  {contentForm.formState.errors.phone.message as string}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="message" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Message (optionnel)
+              </Label>
+              <Textarea
+                id="message"
+                placeholder="Message pré-rempli..."
+                rows={3}
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none"
+                {...contentForm.register("message")}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* SOCIAL */}
+        {selectedType === "SOCIAL" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="platform" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Réseau social
+              </Label>
+              <Select
+                onValueChange={(value) => contentForm.setValue("platform", value)}
+              >
+                <SelectTrigger className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary">
+                  <SelectValue placeholder="Sélectionnez un réseau" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="facebook">Facebook</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="twitter">Twitter</SelectItem>
+                  <SelectItem value="linkedin">LinkedIn</SelectItem>
+                  <SelectItem value="youtube">YouTube</SelectItem>
+                  <SelectItem value="tiktok">TikTok</SelectItem>
+                </SelectContent>
+              </Select>
+              {contentForm.formState.errors.platform && (
+                <p className="text-xs text-red-500 mt-1">
+                  {contentForm.formState.errors.platform.message as string}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Nom d'utilisateur
+              </Label>
+              <Input
+                id="username"
+                placeholder="@username"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("username")}
+              />
+              {contentForm.formState.errors.username && (
+                <p className="text-xs text-red-500 mt-1">
+                  {contentForm.formState.errors.username.message as string}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* WIFI */}
+        {selectedType === "WIFI" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ssid" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Nom du réseau (SSID)
+              </Label>
+              <Input
+                id="ssid"
+                placeholder="NomDuReseau"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("ssid")}
+              />
+              {contentForm.formState.errors.ssid && (
+                <p className="text-xs text-red-500 mt-1">
+                  {contentForm.formState.errors.ssid.message as string}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Mot de passe
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="MotDePasse123"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("password")}
+              />
+              {contentForm.formState.errors.password && (
+                <p className="text-xs text-red-500 mt-1">
+                  {contentForm.formState.errors.password.message as string}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="security" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Type de sécurité
+              </Label>
+              <Select
+                onValueChange={(value) => contentForm.setValue("security", value)}
+                defaultValue="WPA2"
+              >
+                <SelectTrigger className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WPA">WPA</SelectItem>
+                  <SelectItem value="WPA2">WPA2</SelectItem>
+                  <SelectItem value="WEP">WEP</SelectItem>
+                  <SelectItem value="nopass">Aucun mot de passe</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {/* VCARD */}
+        {selectedType === "VCARD" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="vcardFirstName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Prénom
+                </Label>
                 <Input
-                  id="table"
-                  placeholder="Table 12"
-                  {...contentForm.register("table")}
+                  id="vcardFirstName"
+                  placeholder="Jean"
+                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  {...contentForm.register("firstName")}
                 />
-                {contentForm.formState.errors.table && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.table.message as string}
+                {contentForm.formState.errors.firstName && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {contentForm.formState.errors.firstName.message as string}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vcardLastName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Nom
+                </Label>
+                <Input
+                  id="vcardLastName"
+                  placeholder="Dupont"
+                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  {...contentForm.register("lastName")}
+                />
+                {contentForm.formState.errors.lastName && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {contentForm.formState.errors.lastName.message as string}
                   </p>
                 )}
               </div>
             </div>
-          )}
-
-          {selectedType === "WHATSAPP" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="phone">Numéro WhatsApp</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+33612345678"
-                  {...contentForm.register("phone")}
-                />
-                {contentForm.formState.errors.phone && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.phone.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="message">Message (optionnel)</Label>
-                <Textarea
-                  id="message"
-                  placeholder="Message pré-rempli..."
-                  rows={3}
-                  {...contentForm.register("message")}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="organization" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Entreprise
+              </Label>
+              <Input
+                id="organization"
+                placeholder="Nom de l'entreprise"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("organization")}
+              />
             </div>
-          )}
-
-          {selectedType === "SOCIAL" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="platform">Réseau social</Label>
-                <Select
-                  onValueChange={(value) => contentForm.setValue("platform", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez un réseau" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="facebook">Facebook</SelectItem>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="twitter">Twitter</SelectItem>
-                    <SelectItem value="linkedin">LinkedIn</SelectItem>
-                    <SelectItem value="youtube">YouTube</SelectItem>
-                    <SelectItem value="tiktok">TikTok</SelectItem>
-                  </SelectContent>
-                </Select>
-                {contentForm.formState.errors.platform && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.platform.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="username">Nom d'utilisateur</Label>
-                <Input
-                  id="username"
-                  placeholder="@username"
-                  {...contentForm.register("username")}
-                />
-                {contentForm.formState.errors.username && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.username.message as string}
-                  </p>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="jobTitle" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Poste
+              </Label>
+              <Input
+                id="jobTitle"
+                placeholder="Directeur"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("title")}
+              />
             </div>
-          )}
-
-          {/* Formulaires événementiels */}
-          {selectedType === "MENU" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="menuTitle">Titre du menu</Label>
-                <Input
-                  id="menuTitle"
-                  placeholder="Menu du repas"
-                  {...contentForm.register("title")}
-                />
-                {contentForm.formState.errors.title && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.title.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label>Plats du menu</Label>
-                <p className="text-xs text-gray-500 mb-2">Ajoutez au moins un plat</p>
-                <div className="space-y-3">
-                  {contentForm.watch("items")?.map((_: any, index: number) => (
-                    <div key={index} className="p-3 border rounded-lg space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Plat {index + 1}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const items = contentForm.getValues("items") || []
-                            items.splice(index, 1)
-                            contentForm.setValue("items", items)
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Input
-                        placeholder="Nom du plat"
-                        {...contentForm.register(`items.${index}.name`)}
-                      />
-                      <Textarea
-                        placeholder="Description (optionnel)"
-                        rows={2}
-                        {...contentForm.register(`items.${index}.description`)}
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Prix (optionnel)"
-                          {...contentForm.register(`items.${index}.price`)}
-                        />
-                        <Input
-                          placeholder="Allergènes (optionnel)"
-                          {...contentForm.register(`items.${index}.allergens`)}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const items = contentForm.getValues("items") || []
-                      contentForm.setValue("items", [...items, { name: "", description: "", price: "", allergens: "" }])
-                    }}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ajouter un plat
-                  </Button>
-                </div>
-                {contentForm.formState.errors.items && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.items.message as string}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedType === "WIFI" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="ssid">Nom du réseau (SSID)</Label>
-                <Input
-                  id="ssid"
-                  placeholder="NomDuReseau"
-                  {...contentForm.register("ssid")}
-                />
-                {contentForm.formState.errors.ssid && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.ssid.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="password">Mot de passe</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="MotDePasse123"
-                  {...contentForm.register("password")}
-                />
-                {contentForm.formState.errors.password && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.password.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="security">Type de sécurité</Label>
-                <Select
-                  onValueChange={(value) => contentForm.setValue("security", value)}
-                  defaultValue="WPA2"
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="WPA">WPA</SelectItem>
-                    <SelectItem value="WPA2">WPA2</SelectItem>
-                    <SelectItem value="WEP">WEP</SelectItem>
-                    <SelectItem value="nopass">Aucun mot de passe</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          {selectedType === "PROGRAM" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="programTitle">Titre du programme</Label>
-                <Input
-                  id="programTitle"
-                  placeholder="Programme de l'événement"
-                  {...contentForm.register("title")}
-                />
-                {contentForm.formState.errors.title && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.title.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label>Événements du programme</Label>
-                <p className="text-xs text-gray-500 mb-2">Ajoutez au moins un événement</p>
-                <div className="space-y-3">
-                  {contentForm.watch("events")?.map((_: any, index: number) => (
-                    <div key={index} className="p-3 border rounded-lg space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Événement {index + 1}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const events = contentForm.getValues("events") || []
-                            events.splice(index, 1)
-                            contentForm.setValue("events", events)
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          type="time"
-                          placeholder="Heure"
-                          {...contentForm.register(`events.${index}.time`)}
-                        />
-                        <Input
-                          placeholder="Lieu (optionnel)"
-                          {...contentForm.register(`events.${index}.location`)}
-                        />
-                      </div>
-                      <Input
-                        placeholder="Titre de l'événement"
-                        {...contentForm.register(`events.${index}.title`)}
-                      />
-                      <Textarea
-                        placeholder="Description (optionnel)"
-                        rows={2}
-                        {...contentForm.register(`events.${index}.description`)}
-                      />
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const events = contentForm.getValues("events") || []
-                      contentForm.setValue("events", [...events, { time: "", title: "", description: "", location: "" }])
-                    }}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ajouter un événement
-                  </Button>
-                </div>
-                {contentForm.formState.errors.events && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.events.message as string}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedType === "VCARD" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="vcardFirstName">Prénom</Label>
-                  <Input
-                    id="vcardFirstName"
-                    placeholder="Jean"
-                    {...contentForm.register("firstName")}
-                  />
-                  {contentForm.formState.errors.firstName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {contentForm.formState.errors.firstName.message as string}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="vcardLastName">Nom</Label>
-                  <Input
-                    id="vcardLastName"
-                    placeholder="Dupont"
-                    {...contentForm.register("lastName")}
-                  />
-                  {contentForm.formState.errors.lastName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {contentForm.formState.errors.lastName.message as string}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="organization">Entreprise</Label>
-                <Input
-                  id="organization"
-                  placeholder="Nom de l'entreprise"
-                  {...contentForm.register("organization")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="vcardTitle">Poste</Label>
-                <Input
-                  id="vcardTitle"
-                  placeholder="Directeur"
-                  {...contentForm.register("title")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="vcardEmail">Email</Label>
-                <Input
-                  id="vcardEmail"
-                  type="email"
-                  placeholder="jean.dupont@example.com"
-                  {...contentForm.register("email")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="vcardPhone">Téléphone</Label>
-                <Input
-                  id="vcardPhone"
-                  type="tel"
-                  placeholder="+33612345678"
-                  {...contentForm.register("phone")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="website">Site web</Label>
-                <Input
-                  id="website"
-                  type="url"
-                  placeholder="https://example.com"
-                  {...contentForm.register("website")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="address">Adresse</Label>
-                <Input
-                  id="address"
-                  placeholder="123 Rue Example, Paris"
-                  {...contentForm.register("address")}
-                />
-              </div>
-            </div>
-          )}
-
-          {selectedType === "COUPON" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="couponCode">Code promo</Label>
-                <Input
-                  id="couponCode"
-                  placeholder="PROMO2024"
-                  {...contentForm.register("code")}
-                />
-                {contentForm.formState.errors.code && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.code.message as string}
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="discount">Réduction</Label>
-                  <Input
-                    id="discount"
-                    placeholder="10"
-                    {...contentForm.register("discount")}
-                  />
-                  {contentForm.formState.errors.discount && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {contentForm.formState.errors.discount.message as string}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="discountType">Type</Label>
-                  <Select
-                    onValueChange={(value) => contentForm.setValue("type", value)}
-                    defaultValue="percentage"
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Pourcentage (%)</SelectItem>
-                      <SelectItem value="amount">Montant (€)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="couponExpires">Date d'expiration (optionnel)</Label>
-                <Input
-                  id="couponExpires"
-                  type="date"
-                  {...contentForm.register("expiresAt")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="couponDescription">Description</Label>
-                <Textarea
-                  id="couponDescription"
-                  placeholder="Conditions d'utilisation..."
-                  rows={3}
-                  {...contentForm.register("description")}
-                />
-              </div>
-            </div>
-          )}
-
-          {selectedType === "PLAYLIST" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="playlistTitle">Titre de la playlist</Label>
-                <Input
-                  id="playlistTitle"
-                  placeholder="Ma playlist"
-                  {...contentForm.register("title")}
-                />
-                {contentForm.formState.errors.title && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.title.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="playlistPlatform">Plateforme</Label>
-                <Select
-                  onValueChange={(value) => contentForm.setValue("platform", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez une plateforme" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="spotify">Spotify</SelectItem>
-                    <SelectItem value="youtube">YouTube</SelectItem>
-                    <SelectItem value="apple">Apple Music</SelectItem>
-                    <SelectItem value="custom">Lien personnalisé</SelectItem>
-                  </SelectContent>
-                </Select>
-                {contentForm.formState.errors.platform && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.platform.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="playlistUrl">URL de la playlist</Label>
-                <Input
-                  id="playlistUrl"
-                  type="url"
-                  placeholder="https://open.spotify.com/playlist/..."
-                  {...contentForm.register("url")}
-                />
-              </div>
-            </div>
-          )}
-
-          {selectedType === "GALLERY" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="galleryTitle">Titre de la galerie</Label>
-                <Input
-                  id="galleryTitle"
-                  placeholder="Galerie photo de l'événement"
-                  {...contentForm.register("title")}
-                />
-                {contentForm.formState.errors.title && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.title.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="galleryImages">Images (optionnel)</Label>
-                <Input
-                  id="galleryImages"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || [])
-                    contentForm.setValue("images", files)
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {selectedType === "LIVE_STREAM" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="streamTitle">Titre du stream</Label>
-                <Input
-                  id="streamTitle"
-                  placeholder="Diffusion en direct"
-                  {...contentForm.register("title")}
-                />
-                {contentForm.formState.errors.title && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.title.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="streamPlatform">Plateforme</Label>
-                <Select
-                  onValueChange={(value) => contentForm.setValue("platform", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez une plateforme" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="youtube">YouTube Live</SelectItem>
-                    <SelectItem value="zoom">Zoom</SelectItem>
-                    <SelectItem value="teams">Microsoft Teams</SelectItem>
-                    <SelectItem value="custom">Lien personnalisé</SelectItem>
-                  </SelectContent>
-                </Select>
-                {contentForm.formState.errors.platform && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.platform.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="streamUrl">URL du stream</Label>
-                <Input
-                  id="streamUrl"
-                  type="url"
-                  placeholder="https://youtube.com/live/..."
-                  {...contentForm.register("url")}
-                />
-                {contentForm.formState.errors.url && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.url.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="streamInstructions">Instructions (optionnel)</Label>
-                <Textarea
-                  id="streamInstructions"
-                  placeholder="Comment se connecter..."
-                  rows={3}
-                  {...contentForm.register("instructions")}
-                />
-              </div>
-            </div>
-          )}
-
-          {selectedType === "FEEDBACK" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="feedbackTitle">Titre du formulaire</Label>
-                <Input
-                  id="feedbackTitle"
-                  placeholder="Formulaire de satisfaction"
-                  {...contentForm.register("title")}
-                />
-                {contentForm.formState.errors.title && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.title.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label>Questions</Label>
-                <p className="text-xs text-gray-500 mb-2">Ajoutez au moins une question</p>
-                <div className="space-y-3">
-                  {contentForm.watch("questions")?.map((_: any, index: number) => (
-                    <div key={index} className="p-3 border rounded-lg space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Question {index + 1}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const questions = contentForm.getValues("questions") || []
-                            questions.splice(index, 1)
-                            contentForm.setValue("questions", questions)
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Input
-                        placeholder="Votre question"
-                        {...contentForm.register(`questions.${index}.question`)}
-                      />
-                      <Select
-                        onValueChange={(value) => contentForm.setValue(`questions.${index}.type`, value)}
-                        defaultValue="rating"
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="rating">Note (étoiles)</SelectItem>
-                          <SelectItem value="text">Texte libre</SelectItem>
-                          <SelectItem value="choice">Choix multiple</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const questions = contentForm.getValues("questions") || []
-                      contentForm.setValue("questions", [...questions, { question: "", type: "rating" }])
-                    }}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ajouter une question
-                  </Button>
-                </div>
-                {contentForm.formState.errors.questions && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.questions.message as string}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedType === "EMAIL" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="email">Adresse email</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="contact@example.com"
+                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("email")}
                 />
-                {contentForm.formState.errors.email && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.email.message as string}
-                  </p>
-                )}
               </div>
-              <div>
-                <Label htmlFor="emailSubject">Sujet (optionnel)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Téléphone
+                </Label>
                 <Input
-                  id="emailSubject"
-                  placeholder="Sujet de l'email"
-                  {...contentForm.register("subject")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="emailBody">Message (optionnel)</Label>
-                <Textarea
-                  id="emailBody"
-                  placeholder="Corps de l'email"
-                  rows={3}
-                  {...contentForm.register("body")}
-                />
-              </div>
-            </div>
-          )}
-
-          {selectedType === "SMS" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="smsPhone">Numéro de téléphone</Label>
-                <Input
-                  id="smsPhone"
+                  id="phone"
                   type="tel"
                   placeholder="+33612345678"
+                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("phone")}
                 />
-                {contentForm.formState.errors.phone && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.phone.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="smsMessage">Message (optionnel)</Label>
-                <Textarea
-                  id="smsMessage"
-                  placeholder="Votre message"
-                  rows={3}
-                  {...contentForm.register("message")}
-                />
               </div>
             </div>
-          )}
-
-          {selectedType === "LOCATION" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="latitude">Latitude</Label>
-                  <Input
-                    id="latitude"
-                    type="text"
-                    placeholder="48.8566"
-                    {...contentForm.register("latitude")}
-                  />
-                  {contentForm.formState.errors.latitude && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {contentForm.formState.errors.latitude.message as string}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="longitude">Longitude</Label>
-                  <Input
-                    id="longitude"
-                    type="text"
-                    placeholder="2.3522"
-                    {...contentForm.register("longitude")}
-                  />
-                  {contentForm.formState.errors.longitude && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {contentForm.formState.errors.longitude.message as string}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="locationName">Nom du lieu (optionnel)</Label>
-                <Input
-                  id="locationName"
-                  placeholder="Tour Eiffel"
-                  {...contentForm.register("name")}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="website" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Site web
+              </Label>
+              <Input
+                id="website"
+                type="url"
+                placeholder="https://example.com"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("website")}
+              />
             </div>
-          )}
-
-          {selectedType === "PHONE" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="phoneNumber">Numéro de téléphone</Label>
-                <Input
-                  id="phoneNumber"
-                  type="tel"
-                  placeholder="+33612345678"
-                  {...contentForm.register("phone")}
-                />
-                {contentForm.formState.errors.phone && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.phone.message as string}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedType === "BITCOIN" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="bitcoinAddress">Adresse Bitcoin</Label>
-                <Input
-                  id="bitcoinAddress"
-                  placeholder="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-                  {...contentForm.register("address")}
-                />
-                {contentForm.formState.errors.address && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.address.message as string}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="bitcoinAmount">Montant (optionnel)</Label>
-                <Input
-                  id="bitcoinAmount"
-                  type="number"
-                  step="0.00000001"
-                  placeholder="0.001"
-                  {...contentForm.register("amount")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="bitcoinLabel">Label (optionnel)</Label>
-                <Input
-                  id="bitcoinLabel"
-                  placeholder="Paiement"
-                  {...contentForm.register("label")}
-                />
-              </div>
-              <div>
-                <Label htmlFor="bitcoinMessage">Message (optionnel)</Label>
-                <Textarea
-                  id="bitcoinMessage"
-                  placeholder="Message pour le paiement"
-                  rows={2}
-                  {...contentForm.register("message")}
-                />
-              </div>
-            </div>
-          )}
-
-          {selectedType === "EVENTBRITE" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="eventbriteUrl">URL de l'événement</Label>
-                <Input
-                  id="eventbriteUrl"
-                  type="url"
-                  placeholder="https://eventbrite.com/e/..."
-                  {...contentForm.register("url")}
-                />
-                {contentForm.formState.errors.url && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {contentForm.formState.errors.url.message as string}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
           </div>
-        </div>
+        )}
 
-        {/* Colonne droite : Preview mobile */}
-        <div className="order-1 lg:order-2 flex items-center justify-center">
-          <div className="relative w-[280px] h-[560px] bg-gray-900 rounded-[3rem] p-2 shadow-2xl">
-            <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative">
-              {/* Barre de statut */}
-              <div className="absolute top-0 left-0 right-0 h-8 bg-gray-900 flex items-center justify-between px-6 text-white text-xs font-medium z-10">
-                <span>9:41</span>
-                <div className="flex items-center gap-1">
-                  <div className="w-4 h-2 border border-white rounded-sm">
-                    <div className="w-full h-full bg-white rounded-sm"></div>
-                  </div>
-                  <div className="w-1 h-1 bg-white rounded-full"></div>
-                  <div className="w-6 h-3 border border-white rounded-sm">
-                    <div className="w-4/5 h-full bg-white rounded-sm"></div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Contenu de l'écran - Landing page personnalisée */}
-              <div className="pt-8 h-full overflow-hidden">
-                {renderLandingPage()}
-              </div>
+        {/* PLAYLIST */}
+        {selectedType === "PLAYLIST" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="playlistTitle" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Titre de la playlist
+              </Label>
+              <Input
+                id="playlistTitle"
+                placeholder="Ma playlist"
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("title")}
+              />
+              {contentForm.formState.errors.title && (
+                <p className="text-xs text-red-500 mt-1">
+                  {contentForm.formState.errors.title.message as string}
+                </p>
+              )}
             </div>
-            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gray-800 rounded-full"></div>
+            <div className="space-y-2">
+              <Label htmlFor="playlistUrl" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                URL (optionnel)
+              </Label>
+              <Input
+                id="playlistUrl"
+                type="url"
+                placeholder="https://spotify.com/playlist/..."
+                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                {...contentForm.register("url")}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     )
   }
 
-  const renderStep3 = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          Personnalisez l'apparence
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Choisissez les couleurs, ajoutez un logo et personnalisez les formes
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Colonne gauche : Options */}
-        <div className="space-y-6 order-2 lg:order-1">
-          <div>
-            <Label htmlFor="name">Nom du QR code</Label>
-            <Input
-              id="name"
-              placeholder="Mon QR code"
-              {...customizationForm.register("name")}
-            />
-            {customizationForm.formState.errors.name && (
-              <p className="text-sm text-red-500 mt-1">
-                {customizationForm.formState.errors.name.message as string}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="folderId">Dossier (optionnel)</Label>
-            <Select
-              onValueChange={(value) => customizationForm.setValue("folderId", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Aucun dossier" />
-              </SelectTrigger>
-              <SelectContent>
-                {folders.map((folder) => (
-                  <SelectItem key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="color">Couleur du QR</Label>
-              <div className="flex gap-2 mt-2">
-                <Input
-                  id="color"
-                  type="color"
-                  className="w-16 h-10 cursor-pointer"
-                  value={customizationForm.watch("color") || "#000000"}
-                  onChange={(e) => {
-                    const newColor = e.target.value
-                    customizationForm.setValue("color", newColor)
-                    // Mise à jour automatique de la preview
-                    setTimeout(() => generatePreview(), 100)
-                  }}
-                />
-                <Input
-                  type="text"
-                  placeholder="#000000"
-                  pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
-                  value={customizationForm.watch("color") || "#000000"}
-                  onChange={(e) => {
-                    const newColor = e.target.value
-                    customizationForm.setValue("color", newColor)
-                    // Mise à jour automatique de la preview
-                    setTimeout(() => generatePreview(), 300)
-                  }}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="backgroundColor">Couleur de fond</Label>
-              <div className="flex gap-2 mt-2">
-                <Input
-                  id="backgroundColor"
-                  type="color"
-                  className="w-16 h-10 cursor-pointer"
-                  value={customizationForm.watch("backgroundColor") || "#FFFFFF"}
-                  onChange={(e) => {
-                    const newColor = e.target.value
-                    customizationForm.setValue("backgroundColor", newColor)
-                    // Mise à jour automatique de la preview
-                    setTimeout(() => generatePreview(), 100)
-                  }}
-                />
-                <Input
-                  type="text"
-                  placeholder="#FFFFFF"
-                  pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
-                  value={customizationForm.watch("backgroundColor") || "#FFFFFF"}
-                  onChange={(e) => {
-                    const newColor = e.target.value
-                    customizationForm.setValue("backgroundColor", newColor)
-                    // Mise à jour automatique de la preview
-                    setTimeout(() => generatePreview(), 300)
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="logoFile">Logo au centre (optionnel, max 5Mo)</Label>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              Le logo sera uploadé uniquement lors de la validation finale
+  const renderStep1 = () => {
+    // Obtenir le template correspondant au type sélectionné
+    const templateType = selectedType ? getTemplateForQRType(selectedType) : null
+    const TemplateComponent = templateType ? getTemplateComponent(templateType) : null
+    
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+        {/* Colonne gauche : Types de QR + Formulaire */}
+        <div className="space-y-6 order-2 lg:order-1 flex flex-col h-full min-h-0">
+          {/* Section sélection de type */}
+          <div className="flex-shrink-0">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              1. Type et contenu
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {selectedType ? "Remplissez les informations ci-dessous" : "Sélectionnez le type de contenu"}
             </p>
-            <Input
-              id="logoFile"
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  handleLogoUpload(file)
-                  // Mise à jour automatique de la preview avec le logo (prévisualisation locale uniquement)
-                  setTimeout(() => generatePreview(), 200)
-                } else {
-                  setLogoPreview(null)
-                  customizationForm.setValue("logoFile", undefined)
-                  // Mise à jour automatique de la preview sans logo
-                  setTimeout(() => generatePreview(), 200)
-                }
-              }}
-            />
-            {logoPreview && (
-              <div className="mt-2 p-2 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Aperçu du logo (prévisualisation locale) :</p>
-                <img 
-                  src={logoPreview} 
-                  alt="Logo preview" 
-                  className="w-16 h-16 object-contain rounded"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 text-xs"
-                  onClick={() => {
-                    setLogoPreview(null)
-                    customizationForm.setValue("logoFile", undefined)
-                    const input = document.getElementById("logoFile") as HTMLInputElement
-                    if (input) input.value = ""
-                    // Mise à jour automatique de la preview sans logo
-                    setTimeout(() => generatePreview(), 200)
-                  }}
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Supprimer
-                </Button>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 drawer-scrollbar space-y-6">
+            {/* Grille de sélection des types */}
+            {!selectedType ? (
+              <div className="grid grid-cols-3 gap-4">
+                {QR_TYPES.map((type) => {
+                  const hasTemplate = getTemplateForQRType(type.id) !== null
+                  return (
+                    <Card
+                      key={type.id}
+                      className={`cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg ${
+                        selectedType === type.id
+                          ? "ring-2 ring-primary shadow-lg"
+                          : "hover:border-primary/50"
+                      }`}
+                      onClick={() => handleTypeSelect(type.id)}
+                    >
+                      <CardContent className="p-4 flex flex-col items-center justify-center space-y-2 h-full">
+                        <div
+                          className={`p-3 rounded-lg bg-gradient-to-br ${type.color} text-white shadow-md`}
+                        >
+                          {type.icon}
+                        </div>
+                        <div className="text-center">
+                          <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                            {type.label}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {type.description}
+                          </p>
+                        </div>
+                        {hasTemplate && (
+                          <Badge className="mt-1 bg-green-500 text-white text-xs">
+                            📱 Template
+                          </Badge>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            ) : (
+              /* Formulaire de contenu avec design amélioré */
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                {renderContentForm() || (
+                  <div className="text-center text-gray-500 py-8">
+                    <p>Formulaire en cours de chargement...</p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-
-          <div>
-            <Label>Forme des pixels</Label>
-            <div className="flex gap-2 mt-2">
-              {(["square", "round", "mixed"] as const).map((shape) => (
-                <Button
-                  key={shape}
-                  type="button"
-                  variant={
-                    customizationForm.watch("pixelShape") === shape
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() => {
-                    customizationForm.setValue("pixelShape", shape)
-                    // Mise à jour automatique de la preview
-                    setTimeout(() => generatePreview(), 100)
-                  }}
-                  className="flex-1"
-                >
-                  {shape === "square" && <Square className="h-4 w-4 mr-2" />}
-                  {shape === "round" && <Circle className="h-4 w-4 mr-2" />}
-                  {shape === "mixed" && <Shapes className="h-4 w-4 mr-2" />}
-                  {shape === "square" && "Carré"}
-                  {shape === "round" && "Rond"}
-                  {shape === "mixed" && "Mixte"}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Personnalisation de la landing page */}
-          <div className="pt-6 border-t">
-            <h4 className="text-md font-semibold mb-4">Personnaliser la page de destination</h4>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="landingBgColor">Couleur de fond</Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      id="landingBgColor"
-                      type="color"
-                      className="w-16 h-10 cursor-pointer"
-                      value={landingPageConfig.backgroundColor}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, backgroundColor: e.target.value })
-                      }}
-                    />
-                    <Input
-                      type="text"
-                      value={landingPageConfig.backgroundColor}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, backgroundColor: e.target.value })
-                      }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="landingTextColor">Couleur du texte</Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      id="landingTextColor"
-                      type="color"
-                      className="w-16 h-10 cursor-pointer"
-                      value={landingPageConfig.textColor}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, textColor: e.target.value })
-                      }}
-                    />
-                    <Input
-                      type="text"
-                      value={landingPageConfig.textColor}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, textColor: e.target.value })
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="landingName">Nom</Label>
-                <Input
-                  id="landingName"
-                  placeholder="John Carlson"
-                  value={landingPageConfig.name}
-                  onChange={(e) => {
-                    setLandingPageConfig({ ...landingPageConfig, name: e.target.value })
-                  }}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="landingTitle">Titre</Label>
-                <Input
-                  id="landingTitle"
-                  placeholder="Gestionnaire de compte"
-                  value={landingPageConfig.title}
-                  onChange={(e) => {
-                    setLandingPageConfig({ ...landingPageConfig, title: e.target.value })
-                  }}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="landingDescription">Description</Label>
-                <Textarea
-                  id="landingDescription"
-                  placeholder="En tant que gestionnaire de comptes..."
-                  rows={3}
-                  value={landingPageConfig.description}
-                  onChange={(e) => {
-                    setLandingPageConfig({ ...landingPageConfig, description: e.target.value })
-                  }}
-                />
-              </div>
-
-              <div>
-                <Label>Informations à afficher</Label>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="showPhone"
-                      checked={landingPageConfig.showPhone}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, showPhone: e.target.checked })
-                      }}
-                      className="rounded"
-                    />
-                    <Label htmlFor="showPhone" className="cursor-pointer">Téléphone</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="showEmail"
-                      checked={landingPageConfig.showEmail}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, showEmail: e.target.checked })
-                      }}
-                      className="rounded"
-                    />
-                    <Label htmlFor="showEmail" className="cursor-pointer">Email</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="showLocation"
-                      checked={landingPageConfig.showLocation}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, showLocation: e.target.checked })
-                      }}
-                      className="rounded"
-                    />
-                    <Label htmlFor="showLocation" className="cursor-pointer">Localisation</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="showSocial"
-                      checked={landingPageConfig.showSocial}
-                      onChange={(e) => {
-                        setLandingPageConfig({ ...landingPageConfig, showSocial: e.target.checked })
-                      }}
-                      className="rounded"
-                    />
-                    <Label htmlFor="showSocial" className="cursor-pointer">Réseaux sociaux</Label>
-                  </div>
-                </div>
-              </div>
-
-              {landingPageConfig.showPhone && (
-                <div>
-                  <Label htmlFor="landingPhone">Numéro de téléphone</Label>
-                  <Input
-                    id="landingPhone"
-                    type="tel"
-                    placeholder="555-100-1000"
-                    value={landingPageConfig.phone}
-                    onChange={(e) => {
-                      setLandingPageConfig({ ...landingPageConfig, phone: e.target.value })
-                    }}
-                  />
-                </div>
-              )}
-
-              {landingPageConfig.showEmail && (
-                <div>
-                  <Label htmlFor="landingEmail">Email</Label>
-                  <Input
-                    id="landingEmail"
-                    type="email"
-                    placeholder="john@example.com"
-                    value={landingPageConfig.email}
-                    onChange={(e) => {
-                      setLandingPageConfig({ ...landingPageConfig, email: e.target.value })
-                    }}
-                  />
-                </div>
-              )}
-
-              {landingPageConfig.showLocation && (
-                <div>
-                  <Label htmlFor="landingLocation">Localisation</Label>
-                  <Input
-                    id="landingLocation"
-                    placeholder="Paris, France"
-                    value={landingPageConfig.location}
-                    onChange={(e) => {
-                      setLandingPageConfig({ ...landingPageConfig, location: e.target.value })
-                    }}
-                  />
-                </div>
-              )}
-
-              <div>
-                <Label htmlFor="landingProfileImage">Image de profil (optionnel)</Label>
-                <Input
-                  id="landingProfileImage"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      const reader = new FileReader()
-                      reader.onload = (event) => {
-                        setLandingPageConfig({ 
-                          ...landingPageConfig, 
-                          profileImage: event.target?.result as string 
-                        })
-                      }
-                      reader.readAsDataURL(file)
-                    }
-                  }}
-                />
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Colonne droite : Preview avec téléphone */}
-        <div className="order-1 lg:order-2">
-          <Label>Aperçu mobile</Label>
-          <div className="mt-2 flex items-center justify-center">
-            {/* Téléphone mockup */}
+        {/* Colonne droite : Preview mobile avec template */}
+        <div className="order-1 lg:order-2 flex items-start justify-center lg:sticky lg:top-0">
+          {selectedType && TemplateComponent ? (
+            <PhoneMockup width={280} height={560}>
+              <TemplateComponent />
+            </PhoneMockup>
+          ) : (
             <div className="relative w-[280px] h-[560px] bg-gray-900 rounded-[3rem] p-2 shadow-2xl">
-              {/* Écran du téléphone */}
               <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative">
                 {/* Barre de statut */}
                 <div className="absolute top-0 left-0 right-0 h-8 bg-gray-900 flex items-center justify-between px-6 text-white text-xs font-medium z-10">
@@ -2731,20 +1821,27 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                   </div>
                 </div>
                 
-                {/* Contenu de l'écran - Landing page personnalisée */}
+                {/* Contenu de l'écran */}
                 <div className="pt-8 h-full overflow-hidden">
-                  {renderLandingPage()}
+                  <div className="h-full flex items-center justify-center p-6">
+                    <div className="text-center text-gray-400">
+                      <QrCode className="h-24 w-24 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Sélectionnez un type de QR code</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              {/* Bouton home (iPhone) */}
               <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gray-800 rounded-full"></div>
             </div>
-          </div>
+          )}
         </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  // renderStep2 supprimé - fusionné avec renderStep1
+  // renderStep3 supprimé - remplacé par QRAppearanceStep
+  // Code orphelin supprimé (anciens champs de formulaire)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -2752,7 +1849,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         side="right"
         className={`w-full sm:max-w-[90vw] lg:max-w-[90vw] p-0 flex flex-col bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 [&>button]:hidden overflow-hidden transition-all duration-300`}
       >
-        {/* En-tête */}
+        {/* En-tête - masqué seulement à l'étape 4 car elle a son propre header */}
+        {step !== 4 && (
         <div className="relative flex-shrink-0 px-6 py-5 bg-gradient-to-r from-primary/5 via-primary/3 to-accent/5 border-b border-primary/10 dark:from-primary/20 dark:via-primary/10 dark:to-accent/20">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
           <div className="flex items-start justify-between relative z-10">
@@ -2766,20 +1864,10 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 </SheetTitle>
               </div>
               <SheetDescription className="text-sm text-gray-600 dark:text-gray-400 ml-12">
-                {useTemplateSystem ? 'Mode Template' : `Étape ${step} sur 3`}
+                Étape {step} sur {totalSteps}
               </SheetDescription>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setUseTemplateSystem(!useTemplateSystem)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  useTemplateSystem
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                {useTemplateSystem ? '📱 Templates' : '⚙️ Classique'}
-              </button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -2791,22 +1879,75 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
             </div>
           </div>
         </div>
+        )}
 
         {/* Contenu scrollable */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 drawer-scrollbar">
-          {useTemplateSystem ? (
-            <TemplateBuilder />
-          ) : (
-            <>
-              {step === 1 && renderStep1()}
-              {step === 2 && renderStep2()}
-              {step === 3 && renderStep3()}
-            </>
+        <div className={`flex-1 min-h-0 ${step === 3 ? 'overflow-hidden p-0' : 'overflow-y-auto px-6 py-6 drawer-scrollbar'}`}>
+          {step === 1 && renderStep1()}
+          {step === 2 && selectedType && (
+            <div className="space-y-6">
+              {/* Formulaire de contenu en haut */}
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  2. Ajoutez du contenu à votre code QR
+                </h3>
+                {renderContentForm()}
+              </div>
+              
+              {/* TemplateBuilder pour la personnalisation */}
+              <TemplateBuilder 
+                onNext={() => {
+                  try {
+                    // Préparer les données pour l'étape d'apparence
+                    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://mon-site-web'
+                    const qrCodeId = `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                    const qrUrl = `${baseUrl}/qr/${qrCodeId}`
+                    
+                    // Mettre à jour les états
+                    setQrCodeData(qrUrl)
+                    setStep(3)
+                  } catch (error) {
+                    console.error('Erreur lors du passage à l\'étape 3:', error)
+                    toast.error("Erreur", {
+                      description: "Impossible de passer à l'étape suivante",
+                    })
+                  }
+                }}
+                onBack={() => {
+                  // Revenir à l'étape précédente (type+contenu)
+                  setStep(1)
+                  setSelectedType(null)
+                }}
+              />
+            </div>
           )}
+          {step === 3 && (
+                qrCodeData && qrCodeData !== "{}" ? (
+                  <QRAppearanceStep
+                    qrData={qrCodeData}
+                    onBack={() => {
+                      // Revenir à l'étape template
+                      setStep(2)
+                    }}
+                    onCreate={async (qrCodeImage, config) => {
+                      setAppearanceConfig(config)
+                      await handleSubmitWithAppearance(qrCodeImage, config)
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full p-6">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-gray-500">Préparation de l'étape d'apparence...</p>
+                      <p className="text-sm text-gray-400 mt-2">Génération de l'URL du QR code</p>
+                    </div>
+                  </div>
+                )
+              )}
         </div>
 
-        {/* Footer avec navigation */}
-        {!useTemplateSystem && (
+        {/* Footer avec navigation - pas à l'étape 4 */}
+        {step !== 4 && step !== 3 && (
           <div className="relative flex-shrink-0 border-t border-primary/10 px-6 py-5 bg-gradient-to-r from-white via-primary/5 to-accent/5 dark:from-gray-900 dark:via-primary/10 dark:to-accent/10 backdrop-blur-sm">
             <div className="flex gap-3 relative z-10">
               {step > 1 && (
@@ -2819,31 +1960,13 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                   Précédent
                 </Button>
               )}
-              {step < 3 ? (
+              {step < totalSteps && (
                 <Button
                   onClick={handleNext}
                   className="flex-1 h-11 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl"
                 >
                   Suivant
                   <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex-1 h-11 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Génération...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Générer le QR code
-                    </>
-                  )}
                 </Button>
               )}
             </div>

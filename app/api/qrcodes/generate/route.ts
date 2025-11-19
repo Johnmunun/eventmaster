@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
     const images = formData.getAll("images") as File[]
     const logoFile = formData.get("logoFile") as File | null
     const templateDataStr = formData.get("templateData") as string | null
+    const frameStyle = formData.get("frameStyle") as string | null
+    const pattern = formData.get("pattern") as string | null
+    const cornerStyle = formData.get("cornerStyle") as string | null
 
     if (!type || !name || !data) {
       return NextResponse.json(
@@ -37,6 +40,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    
+    // Vérifier que data n'est pas "{}"
+    if (data === "{}" || data.trim() === "{}") {
+      console.error("Les données sont vides ({}), type:", type)
+      return NextResponse.json(
+        { success: false, error: "Les données du QR code sont invalides" },
+        { status: 400 }
+      )
+    }
+    
+    console.log("API - Type:", type, "Name:", name, "Data (premiers 100 chars):", data?.substring(0, 100))
 
     // Vérifier que le dossier appartient à l'utilisateur si fourni
     if (folderId) {
@@ -53,6 +67,30 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         )
       }
+    }
+
+    // Générer un code unique pour le QR code (avant l'upload pour avoir le code disponible)
+    let code: string = ""
+    let isUnique = false
+    let attempts = 0
+    const maxAttempts = 10
+
+    while (!isUnique && attempts < maxAttempts) {
+      code = crypto.randomBytes(16).toString('hex')
+      const existing = await db.qrCode.findUnique({
+        where: { code }
+      })
+      if (!existing) {
+        isUnique = true
+      }
+      attempts++
+    }
+
+    if (!isUnique || !code) {
+      return NextResponse.json(
+        { success: false, error: "Impossible de générer un code unique. Veuillez réessayer." },
+        { status: 500 }
+      )
     }
 
     // Gérer l'upload des fichiers selon le type
@@ -104,30 +142,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Générer un code unique pour le QR code
-    let code: string
-    let isUnique = false
-    let attempts = 0
-    const maxAttempts = 10
-
-    while (!isUnique && attempts < maxAttempts) {
-      code = crypto.randomBytes(16).toString('hex')
-      const existing = await db.qrCode.findUnique({
-        where: { code }
-      })
-      if (!existing) {
-        isUnique = true
-      }
-      attempts++
-    }
-
-    if (!isUnique) {
-      return NextResponse.json(
-        { success: false, error: "Impossible de générer un code unique. Veuillez réessayer." },
-        { status: 500 }
-      )
-    }
-
     // Options de génération du QR code
     const qrCodeOptions: any = {
       color: {
@@ -141,28 +155,47 @@ export async function POST(request: NextRequest) {
       width: 512,
     }
 
-    // Si un logo est fourni, on l'ajoute au centre du QR code
+    // Si un logo est fourni, on l'upload sur ImageKit et on sauvegarde l'URL
+    let logoUrl: string | null = null
+    let logoFileId: string | null = null
     if (logoFile) {
       try {
         const logoBuffer = Buffer.from(await logoFile.arrayBuffer())
-        // Pour ajouter un logo au centre, on utilise une approche différente
-        // On génère d'abord le QR code, puis on superpose le logo
-        // Pour simplifier, on stocke le logo séparément et on le superpose côté client
         const logoResult = await uploadToImageKit({
           file: logoBuffer,
-          fileName: `logo-${Date.now()}-${logoFile.name}`,
+          fileName: `logo-${code}-${Date.now()}-${logoFile.name}`,
           folder: "/qrcodes/logos",
           tags: ["qrcode", "logo", "eventmaster"],
         })
+        logoUrl = logoResult.url
+        logoFileId = logoResult.fileId
         qrCodeOptions.logo = logoResult.url
+        uploadedFiles.push(logoResult.url) // Ajouter le logo aux fichiers uploadés
       } catch (error) {
         console.error("Erreur upload logo:", error)
         // On continue sans logo si l'upload échoue
       }
     }
 
-    // Générer le QR code
-    const qrCodeDataUrl = await QRCode.toDataURL(finalData, qrCodeOptions)
+    // Construire l'URL finale pour le QR code
+    // TOUS les QR codes doivent pointer vers /qr/${code} pour afficher le contenu dynamiquement
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'
+    const qrCodeUrl = `${appUrl}/qr/${code}`
+    
+    // Générer le QR code avec l'URL de redirection
+    // TOUS les QR codes pointent vers /qr/${code} pour afficher le contenu dynamiquement
+    let qrCodeDataUrl: string
+    try {
+      // @ts-ignore - QRCode.toDataURL retourne bien une Promise<string>
+      const result: string = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions)
+      qrCodeDataUrl = result
+    } catch (error) {
+      console.error("Erreur génération QR code:", error)
+      return NextResponse.json(
+        { success: false, error: "Impossible de générer le QR code" },
+        { status: 500 }
+      )
+    }
 
     // Convertir base64 en Buffer pour ImageKit
     const base64Data = qrCodeDataUrl.replace(/^data:image\/\w+;base64,/, '')
@@ -189,19 +222,25 @@ export async function POST(request: NextRequest) {
       // En cas d'erreur ImageKit, on continue avec base64
     }
 
-    // Préparer les données à stocker
-    const qrCodeData = {
-      name: name,
-      url: finalData,
-      color: color,
-      backgroundColor: backgroundColor,
-      pixelShape: pixelShape,
-      image: qrCodeDataUrl, // Garder base64 en fallback
-      imageKitUrl: imageKitUrl,
-      imageKitFileId: imageKitFileId,
-      imageKitThumbnailUrl: imageKitThumbnailUrl,
-      uploadedFiles: uploadedFiles,
-      logoUrl: qrCodeOptions.logo || null,
+    // Fonction helper pour uploader une image base64 vers ImageKit
+    const uploadBase64Image = async (base64Data: string, fileName: string): Promise<{ url: string; fileId: string } | null> => {
+      try {
+        // Convertir base64 en Buffer
+        const base64Match = base64Data.match(/^data:image\/(\w+);base64,(.+)$/)
+        if (!base64Match) return null
+        
+        const imageBuffer = Buffer.from(base64Match[2], 'base64')
+        const result = await uploadToImageKit({
+          file: imageBuffer,
+          fileName: fileName,
+          folder: "/qrcodes/templates",
+          tags: ["qrcode", "template", "eventmaster"],
+        })
+        return { url: result.url, fileId: result.fileId }
+      } catch (error) {
+        console.error("Erreur upload image base64:", error)
+        return null
+      }
     }
 
     // Parser templateData si présent
@@ -209,47 +248,116 @@ export async function POST(request: NextRequest) {
     if (templateDataStr) {
       try {
         templateData = JSON.parse(templateDataStr)
+        
+        // Uploader les images base64 vers ImageKit et remplacer par les URLs
+        const uploadedFileIds: Array<{ type: string; fileId: string }> = []
+        
+        // Uploader coverImage si c'est une base64
+        if (templateData.globalConfig?.coverImage && templateData.globalConfig.coverImage.startsWith('data:image')) {
+          const result = await uploadBase64Image(
+            templateData.globalConfig.coverImage,
+            `cover-${code}-${Date.now()}.png`
+          )
+          if (result) {
+            templateData.globalConfig.coverImage = result.url
+            uploadedFileIds.push({ type: 'coverImage', fileId: result.fileId })
+          }
+        }
+        
+        // Uploader logo si c'est une base64 (si pas déjà uploadé via logoFile)
+        if (templateData.globalConfig?.logo && templateData.globalConfig.logo.startsWith('data:image') && !logoUrl) {
+          const result = await uploadBase64Image(
+            templateData.globalConfig.logo,
+            `logo-${code}-${Date.now()}.png`
+          )
+          if (result) {
+            templateData.globalConfig.logo = result.url
+            uploadedFileIds.push({ type: 'logo', fileId: result.fileId })
+          }
+        } else if (logoUrl) {
+          // Si logo a été uploadé via logoFile, utiliser cette URL
+          templateData.globalConfig = templateData.globalConfig || {}
+          templateData.globalConfig.logo = logoUrl
+          if (logoFileId) {
+            uploadedFileIds.push({ type: 'logo', fileId: logoFileId })
+          }
+        }
+        
+        // Uploader les images dans templateData (profileImage, etc.)
+        if (templateData.templateData) {
+          const imageFields = ['profileImage', 'coverImage', 'image', 'artistImage', 'coupleImage', 'personImage', 'bannerImage', 'placeImage']
+          
+          for (const field of imageFields) {
+            if (templateData.templateData[field] && typeof templateData.templateData[field] === 'string' && templateData.templateData[field].startsWith('data:image')) {
+              const result = await uploadBase64Image(
+                templateData.templateData[field],
+                `${field}-${code}-${Date.now()}.png`
+              )
+              if (result) {
+                templateData.templateData[field] = result.url
+                uploadedFileIds.push({ type: field, fileId: result.fileId })
+              }
+            }
+          }
+        }
+        
+        // Mettre à jour globalConfig avec les URLs des fichiers uploadés
+        if (!templateData.globalConfig) {
+          templateData.globalConfig = {}
+        }
+        
+        // Si coverImage n'est pas défini et qu'on a des images uploadées, utiliser la première
+        if (!templateData.globalConfig.coverImage && uploadedFiles.length > 0) {
+          templateData.globalConfig.coverImage = uploadedFiles[0]
+        }
+        
+        // Sauvegarder les IDs des fichiers ImageKit pour la suppression future
+        if (imageKitFileId) {
+          uploadedFileIds.push({ type: 'qrcode', fileId: imageKitFileId })
+        }
+        templateData.uploadedFileIds = uploadedFileIds
       } catch (e) {
         console.error("Erreur parsing templateData:", e)
       }
     }
 
-    // Pour les templates, mettre à jour l'URL avec le vrai code
-    if (type === "TEMPLATE" && templateData) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-      qrCodeData.url = `${appUrl}/qr/${code}`
-      // Régénérer le QR code avec la bonne URL
-      const updatedQrCodeDataUrl = await QRCode.toDataURL(qrCodeData.url, qrCodeOptions)
-      const updatedBase64Data = updatedQrCodeDataUrl.replace(/^data:image\/\w+;base64,/, '')
-      const updatedImageBuffer = Buffer.from(updatedBase64Data, 'base64')
-      
-      try {
-        const updatedImageKitResult = await uploadToImageKit({
-          file: updatedImageBuffer,
-          fileName: `qrcode-${code}-${Date.now()}.png`,
-          folder: "/qrcodes",
-          tags: ["qrcode", "eventmaster", "template"],
-        })
-        qrCodeData.imageKitUrl = updatedImageKitResult.url
-        qrCodeData.imageKitFileId = updatedImageKitResult.fileId
-        qrCodeData.imageKitThumbnailUrl = updatedImageKitResult.thumbnailUrl
-        qrCodeData.image = updatedQrCodeDataUrl
-      } catch (e) {
-        console.error("Erreur upload QR code mis à jour:", e)
-      }
+    // Préparer les données à stocker
+    // url contient l'URL de redirection (/qr/${code})
+    // originalData contient les données originales (pour PDF, IMAGE, URL, etc.)
+    const qrCodeData = {
+      name: name,
+      url: qrCodeUrl, // URL de redirection vers /qr/${code}
+      originalData: finalData, // Données originales (URL du PDF, image, texte, etc.)
+      type: type, // Type du QR code pour savoir comment l'afficher
+      color: color,
+      backgroundColor: backgroundColor,
+      pixelShape: pixelShape,
+      image: qrCodeDataUrl, // Garder base64 en fallback
+      imageKitUrl: imageKitUrl,
+      imageKitFileId: imageKitFileId,
+      imageKitThumbnailUrl: imageKitThumbnailUrl,
+      uploadedFiles: uploadedFiles, // Tous les fichiers uploadés (PDFs, images, logos)
+      logoUrl: logoUrl, // URL du logo uploadé
+      logoFileId: logoFileId, // ID ImageKit du logo pour suppression
     }
 
     // Créer le QR code dans la base de données
+    const createData: any = {
+      code: code,
+      type: type as any,
+      data: qrCodeData,
+      folderId: folderId || null,
+      userId: userId,
+      scanned: false,
+    }
+
+    // Ajouter templateData seulement s'il est défini (le champ peut ne pas exister dans certaines versions du schéma)
+    if (templateData !== null && templateData !== undefined) {
+      createData.templateData = templateData
+    }
+
     const qrCode = await db.qrCode.create({
-      data: {
-        code: code!,
-        type: type as any,
-        data: qrCodeData,
-        templateData: templateData,
-        folderId: folderId || null,
-        userId: userId,
-        scanned: false,
-      },
+      data: createData,
       include: {
         folder: {
           select: {
@@ -271,7 +379,7 @@ export async function POST(request: NextRequest) {
         image: imageKitUrl || qrCodeDataUrl,
         imageKitUrl: imageKitUrl,
         imageKitFileId: imageKitFileId,
-        url: finalData,
+        url: qrCodeUrl,
         folder: qrCode.folder,
         createdAt: qrCode.createdAt.toISOString(),
       }

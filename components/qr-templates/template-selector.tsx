@@ -6,7 +6,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Check } from "lucide-react"
 
-export function TemplateSelector() {
+interface TemplateSelectorProps {
+  onHover?: (templateType: TemplateType | null) => void
+}
+
+export function TemplateSelector({ onHover }: TemplateSelectorProps) {
   const { selectedTemplate, setSelectedTemplate } = useQRTemplateStore()
 
   return (
@@ -20,6 +24,8 @@ export function TemplateSelector() {
               : "hover:border-primary/50"
           }`}
           onClick={() => setSelectedTemplate(option.value)}
+          onMouseEnter={() => onHover && onHover(option.value)}
+          onMouseLeave={() => onHover && onHover(null)}
         >
           <CardContent className="p-4 flex flex-col items-center justify-center space-y-2 h-full">
             <div className="p-3 rounded-lg bg-gradient-to-br from-primary to-secondary text-white shadow-md">
