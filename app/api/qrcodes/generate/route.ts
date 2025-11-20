@@ -445,6 +445,7 @@ export async function POST(request: NextRequest) {
         imageKitUrl: imageKitUrl,
         imageKitFileId: imageKitFileId,
         url: qrCodeUrl,
+        qrUrl: qrCodeUrl, // URL complète pour le QR code
         folder: qrCode.folder,
         createdAt: qrCode.createdAt.toISOString(),
       }

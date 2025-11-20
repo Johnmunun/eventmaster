@@ -7,7 +7,9 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params
-    const qrId = resolvedParams.id
+    const qrId = decodeURIComponent(resolvedParams.id)
+
+    console.log("Recherche QR code par ID:", qrId)
 
     // Récupérer le QR code
     const qrCode = await db.qrCode.findUnique({
@@ -21,11 +23,14 @@ export async function GET(
     })
 
     if (!qrCode) {
+      console.error("QR code non trouvé avec l'ID:", qrId)
       return NextResponse.json(
         { success: false, error: "QR code introuvable" },
         { status: 404 }
       )
     }
+    
+    console.log("QR code trouvé:", qrCode.id)
 
     // Parser les données du QR code
     let qrCodeData: any = {}

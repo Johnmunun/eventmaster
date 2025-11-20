@@ -403,18 +403,65 @@ export default function QRPublicPage() {
           decodedId = qrId
         }
 
-        // Essayer d'abord par code (le plus probable)
-        let response = await fetch(`/api/qrcodes/code/${encodeURIComponent(decodedId)}/template`)
-        let data = await response.json()
-
-        // Si pas trouvé par code, essayer par ID
-        if (!response.ok || !data.success) {
-          response = await fetch(`/api/qrcodes/${encodeURIComponent(decodedId)}/template`)
+        // Décoder et nettoyer l'ID
+        const cleanId = decodedId.trim()
+        
+        // Détecter le type d'identifiant
+        // Les codes sont des hex de 32 caractères (16 bytes = 32 hex chars)
+        // Les IDs sont des cuid (commencent par 'c' suivi de 24 caractères alphanumériques)
+        const isLikelyCode = /^[a-f0-9]{32}$/i.test(cleanId)
+        const isLikelyCuid = /^c[a-z0-9]{24}$/i.test(cleanId)
+        
+        let response
+        let data
+        
+        if (isLikelyCode) {
+          // C'est probablement un code hex, essayer par code d'abord
+          console.log("Tentative par code (hex 32 chars):", cleanId)
+          response = await fetch(`/api/qrcodes/code/${encodeURIComponent(cleanId)}/template`)
           data = await response.json()
+          
+          // Si pas trouvé par code, essayer par ID
+          if (!response.ok || !data.success) {
+            console.log("Tentative par code échouée, essai par ID:", cleanId)
+            response = await fetch(`/api/qrcodes/${encodeURIComponent(cleanId)}/template`)
+            data = await response.json()
+          }
+        } else if (isLikelyCuid) {
+          // C'est probablement un ID (cuid), essayer par ID d'abord
+          console.log("Tentative par ID (cuid):", cleanId)
+          response = await fetch(`/api/qrcodes/${encodeURIComponent(cleanId)}/template`)
+          data = await response.json()
+          
+          // Si pas trouvé par ID, essayer par code
+          if (!response.ok || !data.success) {
+            console.log("Tentative par ID échouée, essai par code:", cleanId)
+            response = await fetch(`/api/qrcodes/code/${encodeURIComponent(cleanId)}/template`)
+            data = await response.json()
+          }
+        } else {
+          // Type inconnu, essayer les deux dans l'ordre
+          console.log("Type d'ID inconnu, tentative par code puis ID:", cleanId)
+          response = await fetch(`/api/qrcodes/code/${encodeURIComponent(cleanId)}/template`)
+          data = await response.json()
+          
+          if (!response.ok || !data.success) {
+            response = await fetch(`/api/qrcodes/${encodeURIComponent(cleanId)}/template`)
+            data = await response.json()
+          }
         }
 
         if (!response.ok || !data.success) {
-          setError(data.error || "QR code introuvable. Assurez-vous que le QR code a été généré avec la dernière version du système.")
+          console.error("QR code non trouvé:", {
+            qrId,
+            decodedId: cleanId,
+            isLikelyCode,
+            isLikelyCuid,
+            responseStatus: response.status,
+            error: data.error
+          })
+          setError(data.error || "QR code introuvable. Le QR code n'existe pas ou a été supprimé.")
+          setLoading(false)
           return
         }
 
