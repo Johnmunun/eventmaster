@@ -5,9 +5,10 @@ import { getTemplateComponent, getTemplateForm } from "./index"
 import { PhoneMockup } from "./phone-mockup"
 import { GlobalConfigForm } from "./global-config-form"
 import { TemplateSelector } from "./template-selector"
+import { FormSection } from "@/components/ui/form-section"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Sparkles, ArrowLeft, QrCode } from "lucide-react"
+import { ArrowRight, Sparkles, ArrowLeft, QrCode, Settings } from "lucide-react"
 import { toast } from "sonner"
 import { useState } from "react"
 
@@ -137,11 +138,11 @@ export function TemplateBuilder({ onNext, onSave, onBack }: TemplateBuilderProps
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-      {/* Colonne gauche : Configuration */}
-      <div className="order-2 lg:order-1 flex flex-col h-full min-h-0">
-        {/* Bouton retour */}
-        {selectedTemplate && (
+    <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 h-full">
+      {/* Colonne gauche : Configuration (col-md-7) */}
+      <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col h-full min-h-0">
+        {/* Bouton retour - masqué si onBack n'est pas fourni (utilisé dans l'étape 2) */}
+        {selectedTemplate && onBack && (
           <div className="mb-4">
             <Button
               variant="ghost"
@@ -162,41 +163,24 @@ export function TemplateBuilder({ onNext, onSave, onBack }: TemplateBuilderProps
             </div>
           ) : (
             <>
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Configuration du template</h3>
-                {TemplateForm && <TemplateForm />}
-              </div>
+              {TemplateForm && (
+                <FormSection
+                  icon={Settings}
+                  title="Configuration du template"
+                  description="Personnalisez les informations spécifiques à ce template."
+                  collapsible={false}
+                >
+                  <TemplateForm />
+                </FormSection>
+              )}
               <GlobalConfigForm />
             </>
           )}
         </div>
-        
-        {/* Bouton Suivant fixe en bas - toujours visible */}
-        {selectedTemplate && (
-          <div className="flex-shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 z-10">
-            <Button
-              onClick={handleNext}
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
-            >
-              {isLoading ? (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2 animate-spin" />
-                  Chargement...
-                </>
-              ) : (
-                <>
-                  Suivant
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </>
-              )}
-            </Button>
-          </div>
-        )}
       </div>
 
-      {/* Colonne droite : Preview mobile */}
-      <div className="order-1 lg:order-2 flex flex-col items-center lg:sticky lg:top-0 h-full">
+      {/* Colonne droite : Preview mobile (col-md-3) */}
+      <div className="order-1 lg:order-2 lg:col-span-3 flex flex-col items-center lg:sticky lg:top-0 h-full">
         {/* Toggle Switch - seulement si un template est sélectionné */}
         {selectedTemplate && (
           <div className="mb-4 w-full" style={{ maxWidth: selectedTemplate === 'whatsapp' ? '320px' : '280px' }}>

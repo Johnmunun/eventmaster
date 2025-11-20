@@ -12,15 +12,33 @@ import {
   Check,
   ArrowLeft,
   ArrowRight,
-  Loader2
+  Loader2,
+  ShoppingBag,
+  Gift,
+  Mail,
+  Bike,
+  Hand,
+  Lock,
+  Folder,
+  FileText
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Pencil } from "lucide-react"
 import { PhoneMockup } from "@/components/qr-templates/phone-mockup"
+import { FormSection } from "@/components/ui/form-section"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { toast } from "sonner"
 // Import dynamique de qrcode pour éviter les problèmes SSR
 let QRCodeLib: any = null
 if (typeof window !== 'undefined') {
@@ -48,21 +66,24 @@ export interface QRAppearanceConfig {
   logo?: string
   foregroundColor: string
   backgroundColor: string
+  name?: string
+  password?: string
+  folderId?: string | null
 }
 
 const FRAME_STYLES = [
-  { id: "none", label: "Aucun", icon: <X className="h-6 w-6" /> },
-  { id: "simple", label: "Simple", icon: <Square className="h-6 w-6" /> },
-  { id: "hand", label: "Main", icon: <QrCode className="h-6 w-6" /> },
-  { id: "bag", label: "Sac", icon: <QrCode className="h-6 w-6" /> },
-  { id: "gift", label: "Cadeau", icon: <QrCode className="h-6 w-6" /> },
-  { id: "envelope", label: "Enveloppe", icon: <QrCode className="h-6 w-6" /> },
-  { id: "scooter", label: "Scooter", icon: <QrCode className="h-6 w-6" /> },
-  { id: "bubble", label: "Bulle", icon: <QrCode className="h-6 w-6" /> },
-  { id: "abstract1", label: "Abstrait 1", icon: <QrCode className="h-6 w-6" /> },
-  { id: "abstract2", label: "Abstrait 2", icon: <QrCode className="h-6 w-6" /> },
-  { id: "abstract3", label: "Abstrait 3", icon: <QrCode className="h-6 w-6" /> },
-  { id: "abstract4", label: "Abstrait 4", icon: <QrCode className="h-6 w-6" /> },
+  { id: "none", label: "Aucun", icon: X },
+  { id: "simple", label: "Simple", icon: Square },
+  { id: "hand", label: "Main", icon: Hand },
+  { id: "bag", label: "Sac", icon: ShoppingBag },
+  { id: "gift", label: "Cadeau", icon: Gift },
+  { id: "envelope", label: "Enveloppe", icon: Mail },
+  { id: "scooter", label: "Scooter", icon: Bike },
+  { id: "bubble", label: "Bulle", icon: QrCode },
+  { id: "abstract1", label: "Abstrait 1", icon: Grid3x3 },
+  { id: "abstract2", label: "Abstrait 2", icon: Grid3x3 },
+  { id: "abstract3", label: "Abstrait 3", icon: Grid3x3 },
+  { id: "abstract4", label: "Abstrait 4", icon: Grid3x3 },
 ]
 
 const PATTERNS = ["square", "dots", "rounded", "circle"]
@@ -81,22 +102,58 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
     pattern: "square",
     cornerStyle: "square",
     foregroundColor: "#000000",
-    backgroundColor: "#FFFFFF"
+    backgroundColor: "#FFFFFF",
+    name: "",
+    password: "",
+    folderId: null
   })
   const [qrCodeImage, setQrCodeImage] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [isLoadingFolders, setIsLoadingFolders] = useState(false)
+
+  // Charger les dossiers
+  useEffect(() => {
+    const fetchFolders = async () => {
+      setIsLoadingFolders(true)
+      try {
+        const response = await fetch("/api/folders")
+        const data = await response.json()
+        if (data.success) {
+          setFolders(data.folders || [])
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des dossiers:", error)
+      } finally {
+        setIsLoadingFolders(false)
+      }
+    }
+    fetchFolders()
+  }, [])
 
   // Générer le QR code
   const generateQRCode = async () => {
+    console.log("generateQRCode appelé", { qrData, qrDataLength: qrData?.length, qrDataType: typeof qrData })
+    
     if (!qrData || qrData === "{}" || qrData.trim() === "") {
       console.warn("qrData is empty or invalid:", qrData)
+      setQrCodeImage("")
+      toast.error("Erreur", {
+        description: "Les données du QR code sont vides. Veuillez remplir tous les champs requis.",
+      })
+      setIsGenerating(false)
       return
     }
     
-    // Vérifier que qrData est une URL valide
-    if (!qrData.startsWith('http://') && !qrData.startsWith('https://') && !qrData.startsWith('/')) {
-      console.warn("qrData n'est pas une URL valide:", qrData)
+    // Valider la longueur des données (QR code a une limite)
+    if (qrData.length > 2953) {
+      console.warn("qrData trop long pour un QR code:", qrData.length)
+      toast.error("Erreur", {
+        description: "Les données sont trop longues pour un QR code. Veuillez réduire la taille.",
+      })
+      setIsGenerating(false)
+      return
     }
     
     console.log("Génération du QR code avec les données:", qrData.substring(0, 100))
@@ -105,25 +162,56 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
     try {
       // Charger dynamiquement qrcode si nécessaire
       if (!QRCodeLib && typeof window !== 'undefined') {
-        const module = await import('qrcode')
-        QRCodeLib = module.default
+        try {
+          const module = await import('qrcode')
+          QRCodeLib = module.default
+        } catch (importError) {
+          console.error("Erreur lors du chargement de la bibliothèque QRCode:", importError)
+          toast.error("Erreur", {
+            description: "Impossible de charger la bibliothèque QR code. Veuillez rafraîchir la page.",
+          })
+          setIsGenerating(false)
+          return
+        }
       }
       
       if (!QRCodeLib) {
         console.error("QRCode library not available")
+        toast.error("Erreur", {
+          description: "La bibliothèque QR code n'est pas disponible. Veuillez rafraîchir la page.",
+        })
+        setIsGenerating(false)
         return
       }
       
+      // Valider les couleurs
+      const isValidColor = (color: string): boolean => {
+        return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color)
+      }
+      
+      const foregroundColor = isValidColor(appearanceConfig.foregroundColor) 
+        ? appearanceConfig.foregroundColor 
+        : "#000000"
+      const backgroundColor = isValidColor(appearanceConfig.backgroundColor) 
+        ? appearanceConfig.backgroundColor 
+        : "#FFFFFF"
+      
       const canvas = document.createElement('canvas')
-      await QRCodeLib.toCanvas(canvas, qrData, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: appearanceConfig.foregroundColor,
-          light: appearanceConfig.backgroundColor
-        },
-        errorCorrectionLevel: 'H'
-      })
+      
+      try {
+        await QRCodeLib.toCanvas(canvas, qrData, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: foregroundColor,
+            light: backgroundColor
+          },
+          errorCorrectionLevel: 'H'
+        })
+      } catch (qrError: any) {
+        console.error("Erreur lors de la génération du canvas QR:", qrError)
+        throw new Error(`Impossible de générer le QR code: ${qrError?.message || "Erreur inconnue"}`)
+      }
       
       // Appliquer les motifs et coins personnalisés
       const ctx = canvas.getContext('2d')
@@ -168,9 +256,9 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                   ctx.closePath()
                   ctx.fill()
                 } else if (appearanceConfig.pattern === 'circle') {
-                  // Motif cercle - cercles plus grands
+                  // Motif cercle - cercles ronds
                   ctx.beginPath()
-                  ctx.arc(x + pixelSize/2, y + pixelSize/2, pixelSize * 0.5, 0, 2 * Math.PI)
+                  ctx.arc(x + pixelSize/2, y + pixelSize/2, pixelSize * 0.45, 0, 2 * Math.PI)
                   ctx.fill()
                 } else {
                   // Par défaut, carré
@@ -224,8 +312,10 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
         const frameCanvas = document.createElement('canvas')
         const framePadding = 40
         const textHeight = 30
+        // Pour le frame "bag", ajouter la hauteur de la poignée
+        const handleHeight = appearanceConfig.frameStyle === "bag" ? 35 : 0
         frameCanvas.width = canvas.width + framePadding * 2
-        frameCanvas.height = canvas.height + framePadding * 2 + textHeight
+        frameCanvas.height = canvas.height + framePadding * 2 + textHeight + handleHeight
         const frameCtx = frameCanvas.getContext('2d')
         
         if (frameCtx) {
@@ -309,16 +399,124 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
             frameCtx.quadraticCurveTo(10, 10, 10 + radius, 10)
             frameCtx.closePath()
             frameCtx.stroke()
+          } else if (appearanceConfig.frameStyle === "bag") {
+            // Cadre sac - style étiquette avec poignée en haut (comme l'image)
+            const radius = 20
+            const handleHeight = 30
+            const handleWidth = 60
+            const handleRadius = 12
+            
+            // Couleur du frame (bleu par défaut si non spécifié)
+            const frameColor = appearanceConfig.frameColor || "#3B82F6"
+            
+            // Dessiner le fond bleu avec dégradé
+            if (appearanceConfig.frameUseGradient) {
+              const gradient = frameCtx.createLinearGradient(0, 0, 0, frameCanvas.height)
+              gradient.addColorStop(0, frameColor)
+              gradient.addColorStop(1, appearanceConfig.frameBackgroundColor || "#1E40AF")
+              frameCtx.fillStyle = gradient
+            } else {
+              // Dégradé subtil même sans option activée pour un effet 3D
+              const gradient = frameCtx.createLinearGradient(0, 0, 0, frameCanvas.height)
+              const darkerColor = frameColor
+              const lighterColor = frameColor + "CC" // Légèrement transparent
+              gradient.addColorStop(0, lighterColor)
+              gradient.addColorStop(0.5, frameColor)
+              gradient.addColorStop(1, darkerColor)
+              frameCtx.fillStyle = gradient
+            }
+            
+            // Poignée/tab en haut au centre (arrondie)
+            const handleX = (frameCanvas.width - handleWidth) / 2
+            frameCtx.beginPath()
+            // Top de la poignée
+            frameCtx.moveTo(handleX + handleRadius, 0)
+            frameCtx.lineTo(handleX + handleWidth - handleRadius, 0)
+            frameCtx.quadraticCurveTo(handleX + handleWidth, 0, handleX + handleWidth, handleRadius)
+            // Côté droit de la poignée
+            frameCtx.lineTo(handleX + handleWidth, handleHeight - handleRadius)
+            frameCtx.quadraticCurveTo(handleX + handleWidth, handleHeight, handleX + handleWidth - handleRadius, handleHeight)
+            // Bas de la poignée (arrondi)
+            frameCtx.lineTo(handleX + handleRadius, handleHeight)
+            frameCtx.quadraticCurveTo(handleX, handleHeight, handleX, handleHeight - handleRadius)
+            // Côté gauche de la poignée
+            frameCtx.lineTo(handleX, handleRadius)
+            frameCtx.quadraticCurveTo(handleX, 0, handleX + handleRadius, 0)
+            frameCtx.closePath()
+            frameCtx.fill()
+            
+            // Corps principal avec coins arrondis
+            const bodyY = handleHeight + 5
+            frameCtx.beginPath()
+            // Top gauche
+            frameCtx.moveTo(10 + radius, bodyY)
+            // Top droit
+            frameCtx.lineTo(frameCanvas.width - 10 - radius, bodyY)
+            frameCtx.quadraticCurveTo(frameCanvas.width - 10, bodyY, frameCanvas.width - 10, bodyY + radius)
+            // Côté droit
+            frameCtx.lineTo(frameCanvas.width - 10, frameCanvas.height - 10 - radius)
+            // Bas droit
+            frameCtx.quadraticCurveTo(frameCanvas.width - 10, frameCanvas.height - 10, frameCanvas.width - 10 - radius, frameCanvas.height - 10)
+            // Bas
+            frameCtx.lineTo(10 + radius, frameCanvas.height - 10)
+            // Bas gauche
+            frameCtx.quadraticCurveTo(10, frameCanvas.height - 10, 10, frameCanvas.height - 10 - radius)
+            // Côté gauche
+            frameCtx.lineTo(10, bodyY + radius)
+            // Top gauche
+            frameCtx.quadraticCurveTo(10, bodyY, 10 + radius, bodyY)
+            frameCtx.closePath()
+            frameCtx.fill()
+            
+            // Ombre/bordure pour plus de profondeur
+            frameCtx.strokeStyle = frameColor
+            frameCtx.lineWidth = 3
+            frameCtx.stroke()
+            
+            // Ajouter le texte "Scanne-moi !" en bas sur le fond bleu
+            if (appearanceConfig.frameText) {
+              frameCtx.fillStyle = "#FFFFFF"
+              frameCtx.font = "bold 16px Arial"
+              frameCtx.textAlign = "center"
+              frameCtx.textBaseline = "middle"
+              const textY = frameCanvas.height - 25
+              frameCtx.fillText(
+                appearanceConfig.frameText, 
+                frameCanvas.width / 2, 
+                textY
+              )
+            }
+          } else if (appearanceConfig.frameStyle === "gift") {
+            // Cadre cadeau - avec ruban
+            frameCtx.beginPath()
+            // Corps du cadeau
+            frameCtx.rect(10, 10, frameCanvas.width - 20, frameCanvas.height - 20)
+            frameCtx.stroke()
+            // Ruban vertical
+            frameCtx.beginPath()
+            frameCtx.moveTo(frameCanvas.width / 2, 10)
+            frameCtx.lineTo(frameCanvas.width / 2, frameCanvas.height - 10)
+            frameCtx.stroke()
+            // Ruban horizontal
+            frameCtx.beginPath()
+            frameCtx.moveTo(10, frameCanvas.height / 2)
+            frameCtx.lineTo(frameCanvas.width - 10, frameCanvas.height / 2)
+            frameCtx.stroke()
+            // Nœud au centre
+            frameCtx.beginPath()
+            frameCtx.arc(frameCanvas.width / 2, frameCanvas.height / 2, 15, 0, Math.PI * 2)
+            frameCtx.fill()
           } else {
             // Par défaut, cadre simple
             frameCtx.strokeRect(10, 10, frameCanvas.width - 20, frameCanvas.height - 20)
           }
           
-          // Dessiner le QR code au centre
-          frameCtx.drawImage(canvas, framePadding, framePadding)
+          // Dessiner le QR code au centre (ajuster pour le frame "bag" avec poignée)
+          const qrY = appearanceConfig.frameStyle === "bag" ? framePadding + 35 : framePadding
+          frameCtx.drawImage(canvas, framePadding, qrY)
           
-          // Ajouter le texte en bas comme un bouton
-          if (appearanceConfig.frameText) {
+          // Ajouter le texte en bas comme un bouton (sauf pour le frame "bag" qui l'a déjà)
+          if (appearanceConfig.frameText && appearanceConfig.frameStyle !== "bag") {
             const buttonY = canvas.height + framePadding + 5
             const buttonHeight = textHeight - 10
             const buttonWidth = Math.min(frameCanvas.width - 40, appearanceConfig.frameText.length * 10 + 20)
@@ -354,13 +552,21 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
         }
         
         const finalDataUrl = frameCanvas.toDataURL('image/png')
+        console.log("QR code généré avec frame, longueur:", finalDataUrl.length)
         setQrCodeImage(finalDataUrl)
       } else {
         const dataUrl = canvas.toDataURL('image/png')
+        console.log("QR code généré sans frame, longueur:", dataUrl.length)
         setQrCodeImage(dataUrl)
       }
     } catch (error) {
       console.error("Erreur lors de la génération du QR code:", error)
+      setQrCodeImage("")
+      const errorMessage = error instanceof Error ? error.message : "Une erreur est survenue lors de la génération du QR code"
+      toast.error("Erreur de génération", {
+        description: errorMessage,
+        duration: 5000,
+      })
     } finally {
       setIsGenerating(false)
     }
@@ -368,8 +574,12 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
 
   // Générer le QR code quand les paramètres changent
   useEffect(() => {
+    console.log("useEffect pour generateQRCode déclenché", { qrData, hasQrData: !!qrData })
     if (qrData) {
       generateQRCode()
+    } else {
+      console.warn("qrData est vide, impossible de générer le QR code")
+      setQrCodeImage("")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -388,21 +598,38 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
   ])
 
   const handleCreate = async () => {
-    if (qrCodeImage && !isSubmitting) {
-      setIsSubmitting(true)
-      try {
-        await onCreate(qrCodeImage, appearanceConfig)
-        // Si la création réussit, le drawer se ferme donc on ne réinitialise pas ici
-      } catch (error) {
-        console.error("Erreur lors de la création:", error)
-        // Réinitialiser l'état en cas d'erreur pour permettre de réessayer
-        setIsSubmitting(false)
-      }
+    console.log("handleCreate appelé", { qrCodeImage: !!qrCodeImage, isSubmitting, qrData })
+    
+    if (!qrCodeImage) {
+      console.error("qrCodeImage est vide, impossible de créer le QR code")
+      toast.error("Erreur", {
+        description: "Le QR code n'a pas pu être généré. Veuillez réessayer.",
+      })
+      return
+    }
+    
+    if (isSubmitting) {
+      console.log("Déjà en cours de soumission, ignore")
+      return
+    }
+    
+    setIsSubmitting(true)
+    try {
+      console.log("Appel de onCreate avec:", { qrCodeImageLength: qrCodeImage.length, appearanceConfig })
+      await onCreate(qrCodeImage, appearanceConfig)
+      // Si la création réussit, le drawer se ferme donc on ne réinitialise pas ici
+    } catch (error) {
+      console.error("Erreur lors de la création:", error)
+      toast.error("Erreur", {
+        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la création du QR code.",
+      })
+      // Réinitialiser l'état en cas d'erreur pour permettre de réessayer
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900" style={{ minHeight: '100%' }}>
+    <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden" style={{ minHeight: '100%', position: 'relative' }}>
       {/* Header avec indicateur de progression */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -439,10 +666,10 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+            <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" style={{ cursor: 'pointer' }}>
               <span className="text-xl">?</span>
             </Button>
-            <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+            <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer" style={{ cursor: 'pointer' }}>
               <span className="text-xl">☰</span>
             </Button>
           </div>
@@ -450,45 +677,119 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
       </div>
 
       {/* Contenu principal */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 min-h-0 overflow-hidden relative z-0">
         {/* Colonne gauche : Configuration */}
-        <div className="space-y-6 overflow-y-auto pr-2 drawer-scrollbar">
-          {/* Section Cadre */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <Frame className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Cadre</h3>
+        <div className="space-y-6 overflow-y-auto pr-2 drawer-scrollbar min-h-0 relative z-0">
+          {/* Section Nom du QR Code */}
+          <FormSection
+            icon={FileText}
+            title="Nom du code QR"
+            description="Donnez un nom à votre code QR."
+            collapsible={false}
+          >
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
+                Nom
+              </Label>
+              <Input
+                value={appearanceConfig.name || ""}
+                onChange={(e) => setAppearanceConfig({ ...appearanceConfig, name: e.target.value })}
+                placeholder="Par exemple : Mon code QR"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600"
+              />
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Les cadres permettent à votre code QR de se démarquer parmi les autres et suscitent plus de scans.
-            </p>
+          </FormSection>
+
+          {/* Section Mot de passe */}
+          <FormSection
+            icon={Lock}
+            title="Mot de passe"
+            description="Protégez votre QR code avec un mot de passe (optionnel)."
+            collapsible={false}
+          >
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
+                Mot de passe (optionnel)
+              </Label>
+              <Input
+                type="password"
+                value={appearanceConfig.password || ""}
+                onChange={(e) => setAppearanceConfig({ ...appearanceConfig, password: e.target.value })}
+                placeholder="Entrez un mot de passe"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600"
+              />
+            </div>
+          </FormSection>
+
+          {/* Section Dossier */}
+          <FormSection
+            icon={Folder}
+            title="Dossier"
+            description="Liez ce QR à un dossier existant ou à un nouveau dossier."
+            collapsible={false}
+          >
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
+                Dossier
+              </Label>
+              <Select
+                value={appearanceConfig.folderId || "none"}
+                onValueChange={(value) => setAppearanceConfig({ ...appearanceConfig, folderId: value === "none" ? null : value })}
+              >
+                <SelectTrigger className="rounded-[2px] border-gray-300 dark:border-gray-600">
+                  <SelectValue placeholder="Aucun dossier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun dossier</SelectItem>
+                  {folders.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </FormSection>
+
+          {/* Section Cadre */}
+          <FormSection
+            icon={Frame}
+            title="Cadre"
+            description="Les cadres permettent à votre code QR de se démarquer parmi les autres et suscitent plus de scans."
+            collapsible={false}
+          >
             <div className="space-y-4">
               <div>
                 <Label className="text-sm font-medium mb-3 block">Style de cadre</Label>
                 <div className="grid grid-cols-4 gap-3">
-                  {FRAME_STYLES.map((frame) => (
-                    <button
-                      key={frame.id}
-                      onClick={() => setAppearanceConfig({ ...appearanceConfig, frameStyle: frame.id === "none" ? null : frame.id })}
-                      className={`relative p-4 rounded-lg border-2 transition-all ${
-                        (appearanceConfig.frameStyle === frame.id || (frame.id === "none" && appearanceConfig.frameStyle === null))
-                          ? "border-primary bg-primary/10 dark:bg-primary/20"
-                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                      }`}
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                          {frame.icon}
+                  {FRAME_STYLES.map((frame) => {
+                    const IconComponent = frame.icon
+                    return (
+                      <button
+                        key={frame.id}
+                        type="button"
+                        onClick={() => setAppearanceConfig({ ...appearanceConfig, frameStyle: frame.id === "none" ? null : frame.id })}
+                        className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                          (appearanceConfig.frameStyle === frame.id || (frame.id === "none" && appearanceConfig.frameStyle === null))
+                            ? "border-primary bg-primary/10 dark:bg-primary/20"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                        }`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded">
+                            <IconComponent className="h-6 w-6" />
+                          </div>
+                          <span className="text-xs text-center">{frame.label}</span>
                         </div>
-                        <span className="text-xs text-center">{frame.label}</span>
-                      </div>
-                      {(appearanceConfig.frameStyle === frame.id || (frame.id === "none" && appearanceConfig.frameStyle === null)) && (
-                        <div className="absolute top-1 right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-sm">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                        {(appearanceConfig.frameStyle === frame.id || (frame.id === "none" && appearanceConfig.frameStyle === null)) && (
+                          <div className="absolute top-1 right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-sm">
+                            <Check className="h-3 w-3 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -527,6 +828,7 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                         value={appearanceConfig.frameColor}
                         onChange={(e) => setAppearanceConfig({ ...appearanceConfig, frameColor: e.target.value })}
                         className="w-12 h-12 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                        style={{ cursor: 'pointer' }}
                       />
                       <input
                         type="text"
@@ -569,6 +871,7 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                           value={appearanceConfig.frameBackgroundColor}
                           onChange={(e) => setAppearanceConfig({ ...appearanceConfig, frameBackgroundColor: e.target.value })}
                           className="w-12 h-12 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                          style={{ cursor: 'pointer' }}
                         />
                         <input
                           type="text"
@@ -583,17 +886,15 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                 </div>
               )}
             </div>
-          </div>
+          </FormSection>
 
           {/* Section Motif */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <Grid3x3 className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Motif du code QR</h3>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Choisissez un motif pour votre code QR et sélectionnez des couleurs.
-            </p>
+          <FormSection
+            icon={Grid3x3}
+            title="Motif du code QR"
+            description="Choisissez un motif pour votre code QR et sélectionnez des couleurs."
+            collapsible={false}
+          >
             <div>
               <Label className="text-sm font-medium mb-3 block">Style de motif</Label>
               <div className="grid grid-cols-4 gap-3">
@@ -622,29 +923,29 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                 ))}
               </div>
             </div>
-          </div>
+          </FormSection>
 
           {/* Section Coins */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <Square className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Coins du code QR</h3>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Sélectionnez le style de coins de votre code QR
-            </p>
+          <FormSection
+            icon={Square}
+            title="Coins du code QR"
+            description="Sélectionnez le style de coins de votre code QR"
+            collapsible={false}
+          >
             <div>
               <Label className="text-sm font-medium mb-3 block">Style de coins</Label>
               <div className="grid grid-cols-3 gap-3">
                 {CORNER_STYLES.map((corner) => (
                   <button
                     key={corner}
+                    type="button"
                     onClick={() => setAppearanceConfig({ ...appearanceConfig, cornerStyle: corner })}
-                    className={`relative p-4 rounded-lg border-2 transition-all ${
+                    className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${
                       appearanceConfig.cornerStyle === corner
                         ? "border-primary bg-primary/10 dark:bg-primary/20"
                         : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                     }`}
+                    style={{ cursor: 'pointer' }}
                   >
                     <div className="flex flex-col items-center gap-2">
                       <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded w-full h-16 flex items-center justify-center">
@@ -661,21 +962,21 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                 ))}
               </div>
             </div>
-          </div>
+          </FormSection>
 
           {/* Section Logo */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <ImageIcon className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">Ajouter un logo</h3>
-              </div>
-              <ChevronRight className="h-5 w-5 text-gray-400" />
+          <FormSection
+            icon={ImageIcon}
+            title="Ajouter un logo"
+            description="Créez un code QR unique en y ajoutant votre logo ou une image."
+            collapsible={false}
+          >
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Fonctionnalité à venir
+              </p>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Créez un code QR unique en y ajoutant votre logo ou une image.
-            </p>
-          </div>
+          </FormSection>
         </div>
 
         {/* Colonne droite : Preview */}
@@ -684,22 +985,26 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
           <div className="mb-4 w-full max-w-[280px]">
             <div className="relative inline-flex rounded-lg border-2 border-primary overflow-hidden bg-white dark:bg-gray-900">
               <button
+                type="button"
                 onClick={() => setViewMode('preview')}
-                className={`px-6 py-2 text-sm font-bold transition-all ${
+                className={`px-6 py-2 text-sm font-bold transition-all cursor-pointer ${
                   viewMode === 'preview'
                     ? 'bg-primary text-white'
                     : 'bg-white dark:bg-gray-900 text-primary'
                 }`}
+                style={{ cursor: 'pointer' }}
               >
                 Aperçu
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode('qrcode')}
-                className={`px-6 py-2 text-sm font-bold transition-all ${
+                className={`px-6 py-2 text-sm font-bold transition-all cursor-pointer ${
                   viewMode === 'qrcode'
                     ? 'bg-primary text-white'
                     : 'bg-white dark:bg-gray-900 text-primary'
                 }`}
+                style={{ cursor: 'pointer' }}
               >
                 Code QR
               </button>
@@ -745,24 +1050,69 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
       </div>
 
       {/* Navigation en bas */}
-      <div className="bg-white border-t px-6 py-4 flex items-center justify-between">
+      <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between relative z-50 flex-shrink-0">
         <Button
+          type="button"
           variant="outline"
-          onClick={onBack}
-          className="flex items-center gap-2"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onBack()
+          }}
+          className="flex items-center gap-2 cursor-pointer relative z-50"
+          style={{ cursor: 'pointer' }}
         >
           <ArrowLeft className="h-4 w-4" />
           Retour
         </Button>
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 mr-4">
+            QR: {qrCodeImage ? '✓' : '✗'} | Gén: {isGenerating ? 'Oui' : 'Non'} | Sub: {isSubmitting ? 'Oui' : 'Non'}
+          </div>
+        )}
         <Button
-          onClick={handleCreate}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log("Bouton Créer cliqué!", { 
+              isGenerating, 
+              isSubmitting, 
+              hasQrCodeImage: !!qrCodeImage,
+              qrCodeImageLength: qrCodeImage?.length || 0,
+              qrData: qrData?.substring(0, 50),
+              disabled: isGenerating || isSubmitting || !qrCodeImage
+            })
+            if (!isGenerating && !isSubmitting && qrCodeImage) {
+              handleCreate()
+            } else {
+              console.warn("Bouton désactivé, impossible de créer", {
+                isGenerating,
+                isSubmitting,
+                hasQrCodeImage: !!qrCodeImage
+              })
+            }
+          }}
           disabled={isGenerating || isSubmitting || !qrCodeImage}
-          className="flex items-center gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl relative z-50"
+          style={{ 
+            cursor: (isGenerating || isSubmitting || !qrCodeImage) ? 'not-allowed' : 'pointer',
+            pointerEvents: 'auto',
+            position: 'relative',
+            zIndex: 50
+          }}
+          title={!qrCodeImage ? "Le QR code est en cours de génération..." : isGenerating ? "Génération en cours..." : ""}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Création...
+            </>
+          ) : isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Génération...
             </>
           ) : (
             <>

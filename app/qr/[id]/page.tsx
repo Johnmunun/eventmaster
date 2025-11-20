@@ -423,6 +423,24 @@ export default function QRPublicPage() {
         setQrCodeData(data.qrCodeData)
         setTemplateData(data.templateData)
 
+        // Mettre à jour le scan du QR code
+        try {
+          if (data.qrCodeId) {
+            // Utiliser l'ID si disponible
+            await fetch(`/api/qrcodes/${data.qrCodeId}/scan`, {
+              method: "PATCH",
+            })
+          } else {
+            // Sinon, utiliser le code
+            await fetch(`/api/qrcodes/code/${encodeURIComponent(decodedId)}/scan`, {
+              method: "PATCH",
+            })
+          }
+        } catch (e) {
+          // Ignorer les erreurs de scan (non bloquant)
+          console.log("Impossible de mettre à jour le scan:", e)
+        }
+
         // Si c'est un template, charger les données dans le store
         if (data.templateData && data.templateData.type) {
           const templateType = data.templateData.type as TemplateType

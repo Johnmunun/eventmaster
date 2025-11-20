@@ -117,6 +117,7 @@ model QrCode {
   guestId     String?    @unique
   userId      String
   folderId    String?
+  password    String?    // Mot de passe haché pour protéger le QR code
   scanned     Boolean    @default(false)
   scannedAt   DateTime?
   createdAt   DateTime   @default(now())

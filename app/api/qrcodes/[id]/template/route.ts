@@ -53,6 +53,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+      qrCodeId: qrCode.id,
       qrCodeType: qrCode.type,
       qrCodeData: qrCodeData, // Contient originalData, url, etc.
       templateData: templateData || {

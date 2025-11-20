@@ -26,9 +26,11 @@ export async function POST(request: NextRequest) {
     const backgroundColor = (formData.get("backgroundColor") as string) || "#FFFFFF"
     const pixelShape = (formData.get("pixelShape") as string) || "square"
     const folderId = formData.get("folderId") as string | null
+    const password = formData.get("password") as string | null
     const pdfFile = formData.get("pdfFile") as File | null
     const images = formData.getAll("images") as File[]
     const logoFile = formData.get("logoFile") as File | null
+    const qrCodeImageFile = formData.get("qrCodeImage") as File | null
     const templateDataStr = formData.get("templateData") as string | null
     const frameStyle = formData.get("frameStyle") as string | null
     const pattern = formData.get("pattern") as string | null
@@ -183,18 +185,40 @@ export async function POST(request: NextRequest) {
     const qrCodeUrl = `${appUrl}/qr/${code}`
     
     // Générer le QR code avec l'URL de redirection
-    // TOUS les QR codes pointent vers /qr/${code} pour afficher le contenu dynamiquement
+    // Si une image avec frames est fournie, l'utiliser, sinon générer un QR code basique
     let qrCodeDataUrl: string
-    try {
-      // @ts-ignore - QRCode.toDataURL retourne bien une Promise<string>
-      const result: string = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions)
-      qrCodeDataUrl = result
-    } catch (error) {
-      console.error("Erreur génération QR code:", error)
-      return NextResponse.json(
-        { success: false, error: "Impossible de générer le QR code" },
-        { status: 500 }
-      )
+    if (qrCodeImageFile) {
+      // Utiliser l'image avec frames fournie par le client
+      try {
+        const arrayBuffer = await qrCodeImageFile.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        qrCodeDataUrl = `data:image/png;base64,${buffer.toString('base64')}`
+      } catch (error) {
+        console.error("Erreur conversion image avec frames:", error)
+        // Fallback: générer un QR code basique
+        try {
+          const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
+          qrCodeDataUrl = result
+        } catch (genError) {
+          console.error("Erreur génération QR code:", genError)
+          return NextResponse.json(
+            { success: false, error: "Impossible de générer le QR code" },
+            { status: 500 }
+          )
+        }
+      }
+    } else {
+      // Générer un QR code basique sans frames
+      try {
+        const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
+        qrCodeDataUrl = result
+      } catch (error) {
+        console.error("Erreur génération QR code:", error)
+        return NextResponse.json(
+          { success: false, error: "Impossible de générer le QR code" },
+          { status: 500 }
+        )
+      }
     }
 
     // Convertir base64 en Buffer pour ImageKit
@@ -342,7 +366,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Créer le QR code dans la base de données
-    const createData: any = {
+    const createData: {
+      code: string
+      type: any
+      data: any
+      folderId: string | null
+      userId: string
+      scanned: boolean
+      password?: string
+      templateData?: any
+    } = {
       code: code,
       type: type as any,
       data: qrCodeData,
@@ -351,22 +384,54 @@ export async function POST(request: NextRequest) {
       scanned: false,
     }
 
+    // Ajouter password si fourni (haché avec bcrypt)
+    if (password && password.trim() !== "") {
+      try {
+        const bcrypt = await import('bcryptjs')
+        const hashedPassword = await bcrypt.default.hash(password, 10)
+        createData.password = hashedPassword
+      } catch (hashError) {
+        console.error("Erreur lors du hachage du mot de passe:", hashError)
+        // Ne pas bloquer la création si le hachage échoue, mais logger l'erreur
+      }
+    }
+
     // Ajouter templateData seulement s'il est défini (le champ peut ne pas exister dans certaines versions du schéma)
     if (templateData !== null && templateData !== undefined) {
       createData.templateData = templateData
     }
 
-    const qrCode = await db.qrCode.create({
-      data: createData,
-      include: {
-        folder: {
-          select: {
-            id: true,
-            name: true,
+    let qrCode
+    try {
+      qrCode = await db.qrCode.create({
+        data: createData,
+        include: {
+          folder: {
+            select: {
+              id: true,
+              name: true,
+            }
           }
         }
+      })
+    } catch (prismaError: any) {
+      console.error("Erreur Prisma lors de la création:", prismaError)
+      
+      // Si l'erreur concerne le champ password, c'est que le client Prisma n'a pas été régénéré
+      if (prismaError.message?.includes("password") || prismaError.message?.includes("Unknown argument")) {
+        console.error("Le client Prisma n'a pas été régénéré. Exécutez: npx prisma generate")
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: "Erreur de configuration: Le client Prisma doit être régénéré. Veuillez exécuter 'npx prisma generate' et redémarrer le serveur." 
+          },
+          { status: 500 }
+        )
       }
-    })
+      
+      // Pour les autres erreurs Prisma
+      throw prismaError
+    }
 
     return NextResponse.json({
       success: true,

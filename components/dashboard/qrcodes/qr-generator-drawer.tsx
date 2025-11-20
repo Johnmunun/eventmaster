@@ -5,7 +5,7 @@
  */
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { TemplateBuilder } from "@/components/qr-templates/template-builder"
 import { useQRTemplateStore, TemplateType } from "@/lib/stores/qr-template-store"
 import { getTemplateComponent } from "@/components/qr-templates/index"
@@ -71,6 +71,8 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { FormSection } from "@/components/ui/form-section"
+import { FileInput } from "@/components/ui/file-input"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 
@@ -460,35 +462,49 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
     description: "",
   })
 
+  // Obtenir le schéma selon le type sélectionné
+  const getSchemaForType = useCallback((type: QRType | null) => {
+    if (!type) return z.object({})
+    switch (type) {
+      case "URL": return urlSchema
+      case "PDF": return pdfSchema
+      case "IMAGE": return imageSchema
+      case "VIDEO": return videoSchema
+      case "TEXT": return textSchema
+      case "GUEST_CARD": return guestCardSchema
+      case "WHATSAPP": return whatsappSchema
+      case "SOCIAL": return socialSchema
+      case "MENU": return menuSchema
+      case "WIFI": return wifiSchema
+      case "PROGRAM": return programSchema
+      case "VCARD": return vcardSchema
+      case "COUPON": return couponSchema
+      case "PLAYLIST": return playlistSchema
+      case "GALLERY": return gallerySchema
+      case "FEEDBACK": return feedbackSchema
+      case "LIVE_STREAM": return liveStreamSchema
+      case "EMAIL": return emailSchema
+      case "SMS": return smsSchema
+      case "LOCATION": return locationSchema
+      case "PHONE": return phoneSchema
+      case "BITCOIN": return bitcoinSchema
+      case "EVENTBRITE": return eventbriteSchema
+      default: return z.object({})
+    }
+  }, [])
+
   // Formulaires par étape
   const contentForm = useForm<any>({
-    resolver: zodResolver(
-      selectedType === "URL" ? urlSchema :
-      selectedType === "PDF" ? pdfSchema :
-      selectedType === "IMAGE" ? imageSchema :
-      selectedType === "VIDEO" ? videoSchema :
-      selectedType === "TEXT" ? textSchema :
-      selectedType === "GUEST_CARD" ? guestCardSchema :
-      selectedType === "WHATSAPP" ? whatsappSchema :
-      selectedType === "SOCIAL" ? socialSchema :
-      selectedType === "MENU" ? menuSchema :
-      selectedType === "WIFI" ? wifiSchema :
-      selectedType === "PROGRAM" ? programSchema :
-      selectedType === "VCARD" ? vcardSchema :
-      selectedType === "COUPON" ? couponSchema :
-      selectedType === "PLAYLIST" ? playlistSchema :
-      selectedType === "GALLERY" ? gallerySchema :
-      selectedType === "FEEDBACK" ? feedbackSchema :
-      selectedType === "LIVE_STREAM" ? liveStreamSchema :
-      selectedType === "EMAIL" ? emailSchema :
-      selectedType === "SMS" ? smsSchema :
-      selectedType === "LOCATION" ? locationSchema :
-      selectedType === "PHONE" ? phoneSchema :
-      selectedType === "BITCOIN" ? bitcoinSchema :
-      selectedType === "EVENTBRITE" ? eventbriteSchema :
-      z.object({})
-    ),
+    resolver: zodResolver(getSchemaForType(selectedType)),
   })
+
+  // Mettre à jour le resolver quand selectedType change (sans réinitialiser le formulaire)
+  useEffect(() => {
+    if (selectedType) {
+      // Juste effacer les erreurs, ne pas réinitialiser le formulaire pour éviter le flash
+      contentForm.clearErrors()
+    }
+  }, [selectedType])
 
   const customizationForm = useForm({
     resolver: zodResolver(customizationSchema),
@@ -750,9 +766,10 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
   const watchedContent = contentForm.watch()
   const watchedCustom = customizationForm.watch()
 
-  // Générer la preview en temps réel quand les données changent (étape 3)
+  // Générer la preview en temps réel quand les données changent (seulement pour les étapes 1 et 2)
+  // L'étape 3 utilise QRAppearanceStep qui génère le QR code côté client
   useEffect(() => {
-    if (step === 3 && selectedType) {
+    if ((step === 1 || step === 2) && selectedType) {
       const timer = setTimeout(() => {
         generatePreview()
       }, 300) // Debounce pour éviter trop de requêtes
@@ -804,7 +821,18 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
   const { setSelectedTemplate: setTemplateType } = useQRTemplateStore()
 
   const handleTypeSelect = async (type: QRType) => {
-    setSelectedType(type)
+    // Initialiser les valeurs par défaut selon le type AVANT de changer le type
+    const defaultValues: any = {}
+    if (type === "MENU") {
+      defaultValues.items = [{ name: "", description: "", price: "", allergens: "" }]
+    } else if (type === "PROGRAM") {
+      defaultValues.events = [{ time: "", title: "", description: "", location: "" }]
+    } else if (type === "FEEDBACK") {
+      defaultValues.questions = [{ question: "", type: "rating" }]
+    }
+    
+    // Réinitialiser le formulaire AVANT de changer le type pour éviter le flash
+    contentForm.reset(defaultValues)
     
     // TOUS les types utilisent le système de template
     const templateType = getTemplateForQRType(type)
@@ -815,22 +843,10 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       setTemplateType("linkpage")
     }
     
-    // Initialiser les valeurs par défaut selon le type
-    const defaultValues: any = {}
-    if (type === "MENU") {
-      defaultValues.items = [{ name: "", description: "", price: "", allergens: "" }]
-    } else if (type === "PROGRAM") {
-      defaultValues.events = [{ time: "", title: "", description: "", location: "" }]
-    } else if (type === "FEEDBACK") {
-      defaultValues.questions = [{ question: "", type: "rating" }]
-    }
-    contentForm.reset(defaultValues)
-    
-    // Passer automatiquement à l'étape 2 (TemplateBuilder) après la sélection
-    // Attendre un peu pour que le state soit mis à jour
-    setTimeout(() => {
-      setStep(2)
-    }, 100)
+    // Changer le type et passer directement à l'étape 2 sans délai pour éviter le flash
+    setSelectedType(type)
+    // Passer immédiatement à l'étape 2 sans setTimeout pour éviter l'affichage du formulaire
+    setStep(2)
   }
 
   const handleNext = async () => {
@@ -1072,26 +1088,41 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
           contentData,
           formState: contentForm.formState
         })
+        const errorMsg = "Impossible de générer le QR code. Les données sont invalides."
         toast.error("Erreur", {
-          description: "Impossible de générer le QR code. Les données sont invalides.",
+          description: errorMsg,
         })
         setIsSubmitting(false)
-        return
+        throw new Error(errorMsg)
       }
       
       if (isEmpty || (!typesWithOptionalData.includes(selectedType || "") && isOnlyEmptyJson)) {
         console.error("qrData est vide ou invalide:", qrData, "Type:", selectedType, "contentData:", contentData)
-        toast.error("Erreur", {
-          description: "Les données du QR code sont invalides. Veuillez remplir tous les champs requis.",
+        const errorMsg = "Les données du QR code sont invalides. Veuillez remplir tous les champs requis."
+        toast.error("Erreur de validation", {
+          description: errorMsg,
+          duration: 5000,
         })
         setIsSubmitting(false)
-        return
+        throw new Error(errorMsg)
+      }
+      
+      // Valider que qrCodeImage est bien fourni
+      if (!qrCodeImage || qrCodeImage.trim() === "") {
+        const errorMsg = "L'image du QR code n'a pas pu être générée. Veuillez réessayer."
+        console.error("qrCodeImage est vide")
+        toast.error("Erreur de génération", {
+          description: errorMsg,
+          duration: 5000,
+        })
+        setIsSubmitting(false)
+        throw new Error(errorMsg)
       }
 
       console.log("Envoi des données au serveur - Type:", selectedType, "qrData (premiers 100 chars):", qrData.substring(0, 100))
 
       // Ajouter les données
-      formData.append("name", customData.name || "QR Code")
+      formData.append("name", appearanceConfig.name || customData.name || "QR Code")
       formData.append("data", qrData)
       formData.append("color", appearanceConfig.foregroundColor)
       formData.append("backgroundColor", appearanceConfig.backgroundColor)
@@ -1099,13 +1130,20 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       formData.append("pattern", appearanceConfig.pattern)
       formData.append("cornerStyle", appearanceConfig.cornerStyle)
       
+      // Ajouter password si fourni
+      if (appearanceConfig.password) {
+        formData.append("password", appearanceConfig.password)
+      }
+      
       // Ajouter templateData si présent
       if (templateDataToSave) {
         formData.append("templateData", JSON.stringify(templateDataToSave))
       }
       
-      if (customData.folderId) {
-        formData.append("folderId", customData.folderId)
+      // Utiliser folderId de appearanceConfig en priorité, sinon customData
+      const folderId = appearanceConfig.folderId || customData.folderId
+      if (folderId) {
+        formData.append("folderId", folderId)
       }
       if (appearanceConfig.logo) {
         // Convertir l'image base64 en blob
@@ -1117,31 +1155,77 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       const qrImageBlob = await (await fetch(qrCodeImage)).blob()
       formData.append("qrCodeImage", qrImageBlob, "qrcode.png")
 
+      // Valider que tous les champs requis sont présents avant l'envoi
+      if (!selectedType) {
+        const errorMsg = "Le type de QR code n'est pas défini"
+        toast.error("Erreur de validation", {
+          description: errorMsg,
+          duration: 5000,
+        })
+        setIsSubmitting(false)
+        throw new Error(errorMsg)
+      }
+      
+      console.log("Envoi des données au serveur:", {
+        type: selectedType,
+        hasQrCodeImage: !!qrCodeImage,
+        qrCodeImageLength: qrCodeImage?.length,
+        qrDataLength: qrData?.length,
+        hasTemplateData: !!templateDataToSave
+      })
+      
       const response = await fetch("/api/qrcodes/generate", {
         method: "POST",
         body: formData,
       })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorMsg = "Impossible de générer le QR code"
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMsg = errorJson.error || errorMsg
+        } catch {
+          errorMsg = errorText || errorMsg
+        }
+        console.error("Erreur API:", response.status, errorMsg)
+        toast.error("Erreur serveur", {
+          description: errorMsg,
+          duration: 5000,
+        })
+        setIsSubmitting(false)
+        throw new Error(errorMsg)
+      }
 
       const result = await response.json()
 
       if (result.success) {
         toast.success("QR code généré avec succès!", {
           description: "Votre QR code a été créé et sauvegardé",
+          duration: 4000,
         })
         onQRCodeCreated?.()
         onOpenChange(false)
       } else {
-        toast.error("Erreur", {
-          description: result.error || "Impossible de générer le QR code",
+        const errorMsg = result.error || "Impossible de générer le QR code"
+        console.error("Erreur dans la réponse:", result)
+        toast.error("Erreur de génération", {
+          description: errorMsg,
+          duration: 5000,
         })
+        setIsSubmitting(false)
+        throw new Error(errorMsg)
       }
     } catch (error) {
-      console.error("Erreur:", error)
-      toast.error("Erreur", {
-        description: "Une erreur est survenue lors de la génération",
-      })
-    } finally {
+      console.error("Erreur lors de la génération du QR code:", error)
+      if (!(error instanceof Error && error.message.includes("Erreur"))) {
+        toast.error("Erreur inattendue", {
+          description: error instanceof Error ? error.message : "Une erreur est survenue lors de la génération",
+          duration: 5000,
+        })
+      }
       setIsSubmitting(false)
+      throw error; // Re-lancer l'erreur
     }
   }
 
@@ -1268,15 +1352,15 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       <div className="space-y-5">
         {/* URL */}
         {selectedType === "URL" && (
-          <div className="space-y-2">
-            <Label htmlFor="url" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <div className="space-y-3">
+            <Label htmlFor="url" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
               URL du site web
             </Label>
             <Input
               id="url"
               type="url"
               placeholder="https://example.com"
-              className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               {...contentForm.register("url")}
             />
             {contentForm.formState.errors.url && (
@@ -1289,28 +1373,19 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
 
         {/* PDF */}
         {selectedType === "PDF" && (
-          <div className="space-y-2">
-            <Label htmlFor="pdfFile" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Fichier PDF
-            </Label>
-            <div className="relative">
-              <Input
-                id="pdfFile"
-                type="file"
-                accept=".pdf"
-                className="rounded-md border-gray-300 dark:border-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    if (file.size > 5 * 1024 * 1024) {
-                      toast.error("Le fichier est trop volumineux (max 5Mo)")
-                      return
-                    }
-                    contentForm.setValue("pdfFile", file)
-                  }
-                }}
-              />
-            </div>
+          <div>
+            <FileInput
+              label="Fichier PDF"
+              accept=".pdf"
+              maxSize={5}
+              onFileChange={(file) => {
+                if (file) {
+                  contentForm.setValue("pdfFile", file)
+                } else {
+                  contentForm.setValue("pdfFile", null)
+                }
+              }}
+            />
             {contentForm.formState.errors.pdfFile && (
               <p className="text-xs text-red-500 mt-1">
                 {contentForm.formState.errors.pdfFile.message as string}
@@ -1321,26 +1396,17 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
 
         {/* IMAGE */}
         {selectedType === "IMAGE" && (
-          <div className="space-y-2">
-            <Label htmlFor="images" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Images
-            </Label>
-            <Input
-              id="images"
-              type="file"
+          <div>
+            <FileInput
+              label="Images"
+              description="Vous pouvez sélectionner plusieurs images"
               accept="image/*"
-              multiple
-              className="rounded-md border-gray-300 dark:border-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
-              onChange={(e) => {
-                const files = Array.from(e.target.files || [])
-                const validFiles = files.filter((file) => {
-                  if (file.size > 5 * 1024 * 1024) {
-                    toast.error(`${file.name} est trop volumineux (max 5Mo)`)
-                    return false
-                  }
-                  return true
-                })
-                contentForm.setValue("images", validFiles)
+              maxSize={5}
+              onFileChange={(file) => {
+                if (file) {
+                  const currentFiles = contentForm.getValues("images") || []
+                  contentForm.setValue("images", [...currentFiles, file])
+                }
               }}
             />
             {contentForm.formState.errors.images && (
@@ -1353,15 +1419,15 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
 
         {/* VIDEO */}
         {selectedType === "VIDEO" && (
-          <div className="space-y-2">
-            <Label htmlFor="videoUrl" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <div className="space-y-3">
+            <Label htmlFor="videoUrl" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
               URL de la vidéo
             </Label>
             <Input
               id="videoUrl"
               type="url"
               placeholder="https://youtube.com/watch?v=..."
-              className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               {...contentForm.register("videoUrl")}
             />
             {contentForm.formState.errors.videoUrl && (
@@ -1374,8 +1440,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
 
         {/* TEXT */}
         {selectedType === "TEXT" && (
-          <div className="space-y-2">
-            <Label htmlFor="text" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <div className="space-y-3">
+            <Label htmlFor="text" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
               Texte
             </Label>
             <Textarea
@@ -1397,14 +1463,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         {selectedType === "GUEST_CARD" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <Label htmlFor="firstName" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                   Prénom
                 </Label>
                 <Input
                   id="firstName"
                   placeholder="Jean"
-                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("firstName")}
                 />
                 {contentForm.formState.errors.firstName && (
@@ -1413,14 +1479,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <Label htmlFor="lastName" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                   Nom
                 </Label>
                 <Input
                   id="lastName"
                   placeholder="Dupont"
-                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("lastName")}
                 />
                 {contentForm.formState.errors.lastName && (
@@ -1430,14 +1496,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="table" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="table" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Numéro de table
               </Label>
               <Input
                 id="table"
                 placeholder="Table 12"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("table")}
               />
               {contentForm.formState.errors.table && (
@@ -1452,15 +1518,15 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         {/* WHATSAPP */}
         {selectedType === "WHATSAPP" && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Numéro WhatsApp
               </Label>
               <Input
                 id="phone"
                 type="tel"
                 placeholder="+33612345678"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("phone")}
               />
               {contentForm.formState.errors.phone && (
@@ -1469,8 +1535,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="message" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="message" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Message (optionnel)
               </Label>
               <Textarea
@@ -1487,8 +1553,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         {/* SOCIAL */}
         {selectedType === "SOCIAL" && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="platform" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="platform" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Réseau social
               </Label>
               <Select
@@ -1512,14 +1578,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="username" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Nom d'utilisateur
               </Label>
               <Input
                 id="username"
                 placeholder="@username"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("username")}
               />
               {contentForm.formState.errors.username && (
@@ -1534,14 +1600,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         {/* WIFI */}
         {selectedType === "WIFI" && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="ssid" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="ssid" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Nom du réseau (SSID)
               </Label>
               <Input
                 id="ssid"
                 placeholder="NomDuReseau"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("ssid")}
               />
               {contentForm.formState.errors.ssid && (
@@ -1550,15 +1616,15 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="password" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Mot de passe
               </Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="MotDePasse123"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("password")}
               />
               {contentForm.formState.errors.password && (
@@ -1567,8 +1633,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="security" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="security" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Type de sécurité
               </Label>
               <Select
@@ -1593,14 +1659,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         {selectedType === "VCARD" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="vcardFirstName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <Label htmlFor="vcardFirstName" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                   Prénom
                 </Label>
                 <Input
                   id="vcardFirstName"
                   placeholder="Jean"
-                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("firstName")}
                 />
                 {contentForm.formState.errors.firstName && (
@@ -1609,14 +1675,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="vcardLastName" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <Label htmlFor="vcardLastName" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                   Nom
                 </Label>
                 <Input
                   id="vcardLastName"
                   placeholder="Dupont"
-                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("lastName")}
                 />
                 {contentForm.formState.errors.lastName && (
@@ -1626,63 +1692,63 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="organization" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="organization" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Entreprise
               </Label>
               <Input
                 id="organization"
                 placeholder="Nom de l'entreprise"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("organization")}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="jobTitle" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="jobTitle" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Poste
               </Label>
               <Input
                 id="jobTitle"
                 placeholder="Directeur"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("title")}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <Label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                   Email
                 </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="contact@example.com"
-                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("email")}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <div className="space-y-3">
+                <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                   Téléphone
                 </Label>
                 <Input
                   id="phone"
                   type="tel"
                   placeholder="+33612345678"
-                  className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   {...contentForm.register("phone")}
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="website" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="website" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Site web
               </Label>
               <Input
                 id="website"
                 type="url"
                 placeholder="https://example.com"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("website")}
               />
             </div>
@@ -1692,14 +1758,14 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         {/* PLAYLIST */}
         {selectedType === "PLAYLIST" && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="playlistTitle" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="playlistTitle" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 Titre de la playlist
               </Label>
               <Input
                 id="playlistTitle"
                 placeholder="Ma playlist"
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("title")}
               />
               {contentForm.formState.errors.title && (
@@ -1708,15 +1774,15 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="playlistUrl" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <div className="space-y-3">
+              <Label htmlFor="playlistUrl" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
                 URL (optionnel)
               </Label>
               <Input
                 id="playlistUrl"
                 type="url"
                 placeholder="https://spotify.com/playlist/..."
-                className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 {...contentForm.register("url")}
               />
             </div>
@@ -1785,16 +1851,41 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                   )
                 })}
               </div>
-            ) : (
+            ) : selectedType ? (
               /* Formulaire de contenu avec design amélioré */
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
-                {renderContentForm() || (
-                  <div className="text-center text-gray-500 py-8">
-                    <p>Formulaire en cours de chargement...</p>
-                  </div>
-                )}
-              </div>
-            )}
+              <FormSection
+                icon={(() => {
+                  const type = QR_TYPES.find(t => t.id === selectedType)
+                  // Mapping des types aux icônes Lucide
+                  const iconMap: Record<string, typeof FileText> = {
+                    "URL": Link,
+                    "PDF": FileText,
+                    "IMAGE": ImageIcon,
+                    "VIDEO": Video,
+                    "TEXT": Type,
+                    "GUEST_CARD": User,
+                    "WHATSAPP": MessageCircle,
+                    "SOCIAL": Share2,
+                    "MENU": Utensils,
+                    "WIFI": Wifi,
+                    "PROGRAM": Calendar,
+                    "VCARD": User,
+                    "COUPON": CreditCard,
+                    "PLAYLIST": Music,
+                    "GALLERY": Image,
+                    "FEEDBACK": MessageSquare,
+                    "LIVE_STREAM": Radio,
+                    "EVENTBRITE": Ticket,
+                  }
+                  return iconMap[selectedType || ""] || FileText
+                })()}
+                title={QR_TYPES.find(t => t.id === selectedType)?.label || "Contenu"}
+                description={`Renseignez les informations pour ${QR_TYPES.find(t => t.id === selectedType)?.label?.toLowerCase() || "ce type de QR code"}.`}
+                collapsible={false}
+              >
+                {renderContentForm()}
+              </FormSection>
+            ) : null}
           </div>
         </div>
 
@@ -1864,7 +1955,7 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 </SheetTitle>
               </div>
               <SheetDescription className="text-sm text-gray-600 dark:text-gray-400 ml-12">
-                Étape {step} sur {totalSteps}
+                {step === 2 ? "2. Ajoutez du contenu à votre code QR" : `Étape ${step} sur ${totalSteps}`}
               </SheetDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -1885,15 +1976,7 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         <div className={`flex-1 min-h-0 ${step === 3 ? 'overflow-hidden p-0' : 'overflow-y-auto px-6 py-6 drawer-scrollbar'}`}>
           {step === 1 && renderStep1()}
           {step === 2 && selectedType && (
-            <div className="space-y-6">
-              {/* Formulaire de contenu en haut */}
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  2. Ajoutez du contenu à votre code QR
-                </h3>
-                {renderContentForm()}
-              </div>
-              
+            <div className="h-full">
               {/* TemplateBuilder pour la personnalisation */}
               <TemplateBuilder 
                 onNext={() => {
@@ -1913,11 +1996,6 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                     })
                   }
                 }}
-                onBack={() => {
-                  // Revenir à l'étape précédente (type+contenu)
-                  setStep(1)
-                  setSelectedType(null)
-                }}
               />
             </div>
           )}
@@ -1930,8 +2008,13 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                       setStep(2)
                     }}
                     onCreate={async (qrCodeImage, config) => {
-                      setAppearanceConfig(config)
-                      await handleSubmitWithAppearance(qrCodeImage, config)
+                      try {
+                        setAppearanceConfig(config)
+                        await handleSubmitWithAppearance(qrCodeImage, config)
+                      } catch (error) {
+                        console.error("Erreur dans onCreate:", error)
+                        throw error // Re-lancer l'erreur pour que handleCreate puisse la gérer
+                      }
                     }}
                   />
                 ) : (
