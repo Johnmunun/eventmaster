@@ -4,7 +4,7 @@ import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 import {
   Select,
   SelectContent,
@@ -24,28 +24,24 @@ export function AnniversaireForm() {
   return (
     <div className="space-y-4">
       <div>
-        <Label>Photo de la personne</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Photo de la personne"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.personImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('personImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('personImage', null)
             }
           }}
+          onRemove={() => handleChange('personImage', null)}
         />
-        {data.personImage && (
-          <ImagePreview
-            src={data.personImage}
-            alt="Photo de la personne"
-            onRemove={() => handleChange('personImage', null)}
-          />
-        )}
       </div>
 
       <div>

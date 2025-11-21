@@ -5,6 +5,7 @@ import Google from "next-auth/providers/google"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import dotenv from "dotenv"
+import { Prisma } from "@prisma/client"
 
 // Charger les variables d'environnement
 dotenv.config({ path: '.env' })
@@ -19,35 +20,58 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email et mot de passe requis")
-        }
-
-        const user = await db.user.findUnique({
-          where: {
-            email: credentials.email as string
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error("Email et mot de passe requis")
           }
-        })
 
-        if (!user || !user.password) {
-          throw new Error("Email ou mot de passe incorrect")
-        }
+          let user
+          try {
+            user = await db.user.findUnique({
+              where: {
+                email: credentials.email as string
+              }
+            })
+          } catch (dbError: any) {
+            // Gérer les erreurs de connexion à la base de données
+            if (
+              dbError instanceof Prisma.PrismaClientKnownRequestError &&
+              (dbError.code === 'P1001' || dbError.code === 'P1000')
+            ) {
+              console.error("Erreur de connexion à la base de données:", dbError.message)
+              throw new Error("Erreur de connexion à la base de données. Veuillez réessayer plus tard.")
+            }
+            if (dbError instanceof Prisma.PrismaClientInitializationError) {
+              console.error("Erreur d'initialisation de la base de données:", dbError.message)
+              throw new Error("Erreur de connexion à la base de données. Veuillez réessayer plus tard.")
+            }
+            throw dbError
+          }
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        )
+          if (!user || !user.password) {
+            throw new Error("Email ou mot de passe incorrect")
+          }
 
-        if (!isPasswordValid) {
-          throw new Error("Email ou mot de passe incorrect")
-        }
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          )
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
+          if (!isPasswordValid) {
+            throw new Error("Email ou mot de passe incorrect")
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: user.role,
+          }
+        } catch (error: any) {
+          console.error("Erreur dans authorize:", error)
+          // Propager l'erreur pour que NextAuth la gère
+          throw error
         }
       }
     }),

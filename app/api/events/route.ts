@@ -17,7 +17,23 @@ const createEventSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Vérifier l'authentification
-    const session = await auth()
+    let session
+    try {
+      session = await auth()
+    } catch (authError: any) {
+      // Gérer les erreurs d'authentification (peut être causé par une erreur DB)
+      if (authError instanceof Prisma.PrismaClientKnownRequestError && authError.code === 'P1001') {
+        return NextResponse.json(
+          { success: false, error: "Impossible de se connecter à la base de données" },
+          { status: 503 }
+        )
+      }
+      console.error("Erreur lors de l'authentification:", authError)
+      return NextResponse.json(
+        { success: false, error: "Erreur d'authentification" },
+        { status: 500 }
+      )
+    }
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -174,7 +190,23 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Vérifier l'authentification
-    const session = await auth()
+    let session
+    try {
+      session = await auth()
+    } catch (authError: any) {
+      // Gérer les erreurs d'authentification (peut être causé par une erreur DB)
+      if (authError instanceof Prisma.PrismaClientKnownRequestError && authError.code === 'P1001') {
+        return NextResponse.json(
+          { success: false, error: "Impossible de se connecter à la base de données" },
+          { status: 503 }
+        )
+      }
+      console.error("Erreur lors de l'authentification:", authError)
+      return NextResponse.json(
+        { success: false, error: "Erreur d'authentification" },
+        { status: 500 }
+      )
+    }
     
     if (!session?.user?.id) {
       return NextResponse.json(

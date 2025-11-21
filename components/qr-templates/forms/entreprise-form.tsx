@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 import { Plus, X } from "lucide-react"
 
 export function EntrepriseForm() {
@@ -35,63 +35,45 @@ export function EntrepriseForm() {
   return (
     <div className="space-y-4">
       <div>
-        <Label>Logo</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Logo"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.logo || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('logo', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('logo', null)
             }
           }}
+          onRemove={() => handleChange('logo', null)}
         />
-        {data.logo && (
-          <div className="mt-2 relative group">
-            <div className="relative overflow-hidden rounded-xl shadow-lg border-2 border-gray-200 w-32 h-32 mx-auto">
-              <img 
-                src={data.logo} 
-                alt="Logo Preview" 
-                className="w-full h-full object-contain p-2 transition-transform group-hover:scale-105"
-              />
-            </div>
-            <button
-              onClick={() => handleChange('logo', null)}
-              className="absolute top-3 right-3 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm hover:bg-red-600 shadow-lg transition-all hover:scale-110"
-            >
-              ×
-            </button>
-          </div>
-        )}
       </div>
 
       <div>
-        <Label>Image bannière (optionnel)</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Image bannière (optionnel)"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.bannerImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('bannerImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('bannerImage', null)
             }
           }}
+          onRemove={() => handleChange('bannerImage', null)}
         />
-        {data.bannerImage && (
-          <ImagePreview
-            src={data.bannerImage}
-            alt="Image bannière"
-            onRemove={() => handleChange('bannerImage', null)}
-          />
-        )}
       </div>
 
       <div>

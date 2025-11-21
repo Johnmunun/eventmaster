@@ -421,9 +421,7 @@ const bitcoinSchema = z.object({
   message: z.string().optional(),
 })
 
-const eventbriteSchema = z.object({
-  url: z.string().url("URL invalide").min(1, "L'URL de l'événement est requise"),
-})
+// eventbriteSchema supprimé - EVENTBRITE utilise le template "eventticket" avec son propre formulaire
 
 const customizationSchema = z.object({
   name: z.string().min(1, "Le nom est requis").max(100, "Nom trop long"),
@@ -488,7 +486,7 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       case "LOCATION": return locationSchema
       case "PHONE": return phoneSchema
       case "BITCOIN": return bitcoinSchema
-      case "EVENTBRITE": return eventbriteSchema
+      // EVENTBRITE utilise le template "eventticket" avec son propre formulaire, pas de schéma ici
       default: return z.object({})
     }
   }, [])
@@ -938,12 +936,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
               errorMessage = "Le numéro de téléphone est requis"
             }
             break
-          case "WIFI":
-            if (!contentData.ssid || !contentData.ssid.trim()) {
-              hasErrors = true
-              errorMessage = "Le nom du réseau Wi-Fi est requis"
-            }
-            break
+          // WIFI utilise le template "wifi" avec son propre formulaire, pas de validation ici
+          // case "WIFI": supprimé - utilise le template
           case "EMAIL":
             if (!contentData.email || !contentData.email.trim()) {
               hasErrors = true
@@ -981,18 +975,10 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
               errorMessage = "Le titre de la playlist est requis"
             }
             break
-          case "LIVE_STREAM":
-            if (!contentData.url || !contentData.url.trim()) {
-              hasErrors = true
-              errorMessage = "L'URL du stream est requise"
-            }
-            break
-          case "EVENTBRITE":
-            if (!contentData.url || !contentData.url.trim()) {
-              hasErrors = true
-              errorMessage = "L'URL Eventbrite est requise"
-            }
-            break
+          // LIVE_STREAM utilise le template "concert" avec son propre formulaire, pas de validation ici
+          // case "LIVE_STREAM": supprimé - utilise le template
+          // EVENTBRITE utilise le template "eventticket" avec son propre formulaire, pas de validation ici
+          // case "EVENTBRITE": supprimé - utilise le template
           case "SOCIAL":
             if (!contentData.platform || !contentData.username || !contentData.username.trim()) {
               hasErrors = true
@@ -1597,63 +1583,7 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
           </div>
         )}
 
-        {/* WIFI */}
-        {selectedType === "WIFI" && (
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <Label htmlFor="ssid" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
-                Nom du réseau (SSID)
-              </Label>
-              <Input
-                id="ssid"
-                placeholder="NomDuReseau"
-                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                {...contentForm.register("ssid")}
-              />
-              {contentForm.formState.errors.ssid && (
-                <p className="text-xs text-red-500 mt-1">
-                  {contentForm.formState.errors.ssid.message as string}
-                </p>
-              )}
-            </div>
-            <div className="space-y-3">
-              <Label htmlFor="password" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
-                Mot de passe
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="MotDePasse123"
-                className="rounded-[2px] border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                {...contentForm.register("password")}
-              />
-              {contentForm.formState.errors.password && (
-                <p className="text-xs text-red-500 mt-1">
-                  {contentForm.formState.errors.password.message as string}
-                </p>
-              )}
-            </div>
-            <div className="space-y-3">
-              <Label htmlFor="security" className="text-sm font-semibold text-gray-700 dark:text-gray-300 block">
-                Type de sécurité
-              </Label>
-              <Select
-                onValueChange={(value) => contentForm.setValue("security", value)}
-                defaultValue="WPA2"
-              >
-                <SelectTrigger className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="WPA">WPA</SelectItem>
-                  <SelectItem value="WPA2">WPA2</SelectItem>
-                  <SelectItem value="WEP">WEP</SelectItem>
-                  <SelectItem value="nopass">Aucun mot de passe</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
+        {/* WIFI utilise le template "wifi" avec son propre formulaire, pas de formulaire ici */}
 
         {/* VCARD */}
         {selectedType === "VCARD" && (

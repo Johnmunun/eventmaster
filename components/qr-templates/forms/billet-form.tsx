@@ -3,7 +3,7 @@
 import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 
 export function BilletForm() {
   const { templateData, updateTemplateData } = useQRTemplateStore()
@@ -16,28 +16,24 @@ export function BilletForm() {
   return (
     <div className="space-y-4">
       <div>
-        <Label>Image de couverture</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Image de couverture"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.coverImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('coverImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('coverImage', null)
             }
           }}
+          onRemove={() => handleChange('coverImage', null)}
         />
-        {data.coverImage && (
-          <ImagePreview
-            src={data.coverImage}
-            alt="Image de couverture"
-            onRemove={() => handleChange('coverImage', null)}
-          />
-        )}
       </div>
 
       <div>

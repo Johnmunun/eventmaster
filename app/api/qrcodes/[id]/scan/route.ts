@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { Prisma } from "@prisma/client"
+import { isDatabaseConnectionError, getDatabaseErrorMessage } from "@/lib/db-utils"
 
 // PATCH - Mettre à jour le scan d'un QR code
 export async function PATCH(
@@ -11,7 +13,8 @@ export async function PATCH(
     const qrCodeId = resolvedParams.id
 
     // Mettre à jour le scan (sans authentification car c'est public)
-    const qrCode = await db.qrCode.update({
+    // Utiliser updateMany pour éviter les erreurs si le QR code n'existe pas
+    const result = await db.qrCode.updateMany({
       where: {
         id: qrCodeId,
       },
@@ -19,11 +22,51 @@ export async function PATCH(
         scanned: true,
         scannedAt: new Date(),
       },
+    })
+
+    // Si aucun QR code n'a été mis à jour, essayer par code
+    if (result.count === 0) {
+      const codeResult = await db.qrCode.updateMany({
+        where: {
+          code: qrCodeId,
+        },
+        data: {
+          scanned: true,
+          scannedAt: new Date(),
+        },
+      })
+
+      if (codeResult.count === 0) {
+        return NextResponse.json(
+          { success: false, error: "QR code non trouvé" },
+          { status: 404 }
+        )
+      }
+
+      // Récupérer le QR code mis à jour pour la réponse
+      const qrCode = await db.qrCode.findFirst({
+        where: { code: qrCodeId },
+        select: {
+          id: true,
+          scanned: true,
+          scannedAt: true,
+        },
+      })
+
+      return NextResponse.json({
+        success: true,
+        qrCode,
+      })
+    }
+
+    // Récupérer le QR code mis à jour pour la réponse
+    const qrCode = await db.qrCode.findUnique({
+      where: { id: qrCodeId },
       select: {
         id: true,
         scanned: true,
         scannedAt: true,
-      }
+      },
     })
 
     return NextResponse.json({
@@ -33,36 +76,29 @@ export async function PATCH(
   } catch (error: any) {
     console.error("Erreur lors de la mise à jour du scan:", error)
     
-    // Si le QR code n'existe pas par ID, essayer par code
-    try {
-      const resolvedParams = await params
-      const code = resolvedParams.id
-      
-      const qrCode = await db.qrCode.update({
-        where: {
-          code: code,
-        },
-        data: {
-          scanned: true,
-          scannedAt: new Date(),
-        },
-        select: {
-          id: true,
-          scanned: true,
-          scannedAt: true,
-        }
-      })
-
-      return NextResponse.json({
-        success: true,
-        qrCode,
-      })
-    } catch (e) {
+    // Gérer les erreurs de connexion à la base de données
+    if (isDatabaseConnectionError(error)) {
       return NextResponse.json(
-        { success: false, error: "QR code non trouvé" },
-        { status: 404 }
+        { success: false, error: getDatabaseErrorMessage(error) },
+        { status: 503 }
       )
     }
+
+    // Gérer les erreurs Prisma
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        // Record not found
+        return NextResponse.json(
+          { success: false, error: "QR code non trouvé" },
+          { status: 404 }
+        )
+      }
+    }
+
+    return NextResponse.json(
+      { success: false, error: "Erreur lors de la mise à jour du scan" },
+      { status: 500 }
+    )
   }
 }
 

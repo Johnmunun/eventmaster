@@ -3,7 +3,7 @@
 import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 
 export function FacebookForm() {
   const { templateData, updateTemplateData } = useQRTemplateStore()
@@ -35,28 +35,24 @@ export function FacebookForm() {
       </div>
 
       <div>
-        <Label>Image de la page (optionnel)</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Image de la page (optionnel)"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.pageImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('pageImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('pageImage', null)
             }
           }}
+          onRemove={() => handleChange('pageImage', null)}
         />
-        {data.pageImage && (
-          <ImagePreview
-            src={data.pageImage}
-            alt="Image de la page Facebook"
-            onRemove={() => handleChange('pageImage', null)}
-          />
-        )}
       </div>
     </div>
   )

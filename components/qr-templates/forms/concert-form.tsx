@@ -4,7 +4,7 @@ import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 import {
   Select,
   SelectContent,
@@ -24,28 +24,24 @@ export function ConcertForm() {
   return (
     <div className="space-y-4">
       <div>
-        <Label>Image de l'artiste</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Image de l'artiste"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.artistImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('artistImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('artistImage', null)
             }
           }}
+          onRemove={() => handleChange('artistImage', null)}
         />
-        {data.artistImage && (
-          <ImagePreview
-            src={data.artistImage}
-            alt="Image de l'artiste"
-            onRemove={() => handleChange('artistImage', null)}
-          />
-        )}
       </div>
 
       <div>

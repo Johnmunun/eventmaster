@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { signIn } from "@/lib/auth"
 import { z } from "zod"
+import { Prisma } from "@prisma/client"
+import { isDatabaseConnectionError, getDatabaseErrorMessage } from "@/lib/db-utils"
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -9,21 +11,45 @@ const loginSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      return NextResponse.json(
+        { success: false, error: "Format de requête invalide" },
+        { status: 400 }
+      )
+    }
     
     // Validation des données
     const validatedData = loginSchema.parse(body)
     
     // Tenter la connexion via NextAuth
-    const result = await signIn("credentials", {
-      email: validatedData.email,
-      password: validatedData.password,
-      redirect: false,
-    })
+    let result
+    try {
+      result = await signIn("credentials", {
+        email: validatedData.email,
+        password: validatedData.password,
+        redirect: false,
+      })
+    } catch (authError: any) {
+      // Gérer les erreurs de connexion à la base de données
+      if (isDatabaseConnectionError(authError)) {
+        return NextResponse.json(
+          { success: false, error: getDatabaseErrorMessage(authError) },
+          { status: 503 }
+        )
+      }
+      // Autres erreurs d'authentification
+      return NextResponse.json(
+        { success: false, error: authError?.message || "Email ou mot de passe incorrect" },
+        { status: 401 }
+      )
+    }
 
     if (!result || result.error) {
       return NextResponse.json(
-        { success: false, error: "Email ou mot de passe incorrect" },
+        { success: false, error: result?.error || "Email ou mot de passe incorrect" },
         { status: 401 }
       )
     }
@@ -40,6 +66,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: error.errors[0].message },
         { status: 400 }
+      )
+    }
+
+    // Gestion des erreurs de connexion à la base de données
+    if (isDatabaseConnectionError(error)) {
+      return NextResponse.json(
+        { success: false, error: getDatabaseErrorMessage(error) },
+        { status: 503 }
       )
     }
 

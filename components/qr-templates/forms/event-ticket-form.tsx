@@ -4,7 +4,7 @@ import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 import {
   Select,
   SelectContent,
@@ -46,12 +46,25 @@ export function EventTicketForm() {
           const result = await response.json()
           if (result.success) {
             setGuests(result.guests || [])
+          } else {
+            // Si l'erreur est liée à la base de données, on continue sans invités
+            if (result.error?.includes("base de données") || result.error?.includes("database")) {
+              console.warn("Impossible de charger les invités (problème de connexion DB):", result.error)
+              setGuests([])
+            } else {
+              console.error("Erreur lors du chargement des invités:", result.error)
+              setGuests([])
+            }
           }
         } catch (error) {
           console.error("Erreur lors du chargement des invités:", error)
+          // En cas d'erreur réseau ou autre, on continue sans invités
+          setGuests([])
         }
       }
       loadGuests()
+    } else {
+      setGuests([])
     }
   }, [data.eventId])
 
@@ -173,28 +186,24 @@ export function EventTicketForm() {
       </div>
 
       <div>
-        <Label>Image de couverture (optionnel)</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Image de couverture (optionnel)"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.coverImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('coverImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('coverImage', null)
             }
           }}
+          onRemove={() => handleChange('coverImage', null)}
         />
-        {data.coverImage && (
-          <ImagePreview
-            src={data.coverImage}
-            alt="Image de couverture"
-            onRemove={() => handleChange('coverImage', null)}
-          />
-        )}
       </div>
 
       {data.eventId && guests.length > 0 && (

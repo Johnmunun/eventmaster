@@ -4,7 +4,7 @@ import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 
 export function LocalisationForm() {
   const { templateData, updateTemplateData } = useQRTemplateStore()
@@ -50,28 +50,24 @@ export function LocalisationForm() {
       </div>
 
       <div>
-        <Label>Photo du lieu (optionnel)</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Photo du lieu (optionnel)"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.placeImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('placeImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('placeImage', null)
             }
           }}
+          onRemove={() => handleChange('placeImage', null)}
         />
-        {data.placeImage && (
-          <ImagePreview
-            src={data.placeImage}
-            alt="Photo du lieu"
-            onRemove={() => handleChange('placeImage', null)}
-          />
-        )}
       </div>
 
       <div>

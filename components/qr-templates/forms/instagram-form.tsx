@@ -4,7 +4,7 @@ import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 
 export function InstagramForm() {
   const { templateData, updateTemplateData } = useQRTemplateStore()
@@ -46,28 +46,24 @@ export function InstagramForm() {
       </div>
 
       <div>
-        <Label>Photo de profil (optionnel)</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Photo de profil (optionnel)"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.profileImage || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('profileImage', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('profileImage', null)
             }
           }}
+          onRemove={() => handleChange('profileImage', null)}
         />
-        {data.profileImage && (
-          <ImagePreview
-            src={data.profileImage}
-            alt="Photo de profil Instagram"
-            onRemove={() => handleChange('profileImage', null)}
-          />
-        )}
       </div>
     </div>
   )

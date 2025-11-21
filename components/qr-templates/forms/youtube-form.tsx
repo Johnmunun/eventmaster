@@ -3,7 +3,7 @@
 import { useQRTemplateStore } from "@/lib/stores/qr-template-store"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ImagePreview } from "../components/image-preview"
+import { FileInput } from "@/components/ui/file-input"
 
 export function YouTubeForm() {
   const { templateData, updateTemplateData } = useQRTemplateStore()
@@ -35,28 +35,24 @@ export function YouTubeForm() {
       </div>
 
       <div>
-        <Label>Miniature personnalisée (optionnel)</Label>
-        <Input
-          type="file"
+        <FileInput
+          label="Miniature personnalisée (optionnel)"
           accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
+          maxSize={5}
+          preview={data.thumbnail || null}
+          onFileChange={(file) => {
             if (file) {
               const reader = new FileReader()
               reader.onload = (event) => {
                 handleChange('thumbnail', event.target?.result)
               }
               reader.readAsDataURL(file)
+            } else {
+              handleChange('thumbnail', null)
             }
           }}
+          onRemove={() => handleChange('thumbnail', null)}
         />
-        {data.thumbnail && (
-          <ImagePreview
-            src={data.thumbnail}
-            alt="Miniature personnalisée"
-            onRemove={() => handleChange('thumbnail', null)}
-          />
-        )}
       </div>
     </div>
   )

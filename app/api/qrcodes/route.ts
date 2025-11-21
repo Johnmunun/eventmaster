@@ -334,6 +334,11 @@ export async function GET(request: NextRequest) {
       // Utiliser ImageKit si disponible, sinon base64
       const imageUrl = qrData?.imageKitUrl || qrData?.image || ""
       
+      // Calculer le nombre de scans
+      // Pour l'instant, on utilise scanned (1 si scanné, 0 sinon)
+      // TODO: Implémenter un vrai compteur de scans si nécessaire
+      const scanCount = qr.scanned ? 1 : 0
+      
       return {
         id: qr.id,
         code: qr.code,
@@ -341,9 +346,12 @@ export async function GET(request: NextRequest) {
         type: qr.type,
         scanned: qr.scanned,
         scannedAt: qr.scannedAt?.toISOString() || null,
+        scanCount: scanCount, // Ajouter le compteur de scans
         createdAt: qr.createdAt.toISOString(),
+        updatedAt: qr.updatedAt.toISOString(),
         imageUrl: imageUrl,
         imageKitFileId: qrData?.imageKitFileId || null,
+        url: qrData?.url || "",
         event: qr.event,
         folder: qr.folder,
         guest: qr.guest,

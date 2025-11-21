@@ -100,26 +100,7 @@ export default function QRCodesPage() {
     return () => clearTimeout(handler)
   }, [searchQuery])
 
-  // Charger les dossiers
-  useEffect(() => {
-    fetchFolders()
-    fetchEvents()
-  }, [])
-
-  // Charger les QR codes quand les filtres changent
-  useEffect(() => {
-    fetchQRCodes()
-  }, [selectedFolder, debouncedSearch, typeFilter, eventFilter])
-
-  // Rafraîchir les dossiers après création/modification
-  useEffect(() => {
-    if (!isCreateFolderOpen && !isCreateOpen) {
-      fetchFolders()
-      fetchQRCodes()
-    }
-  }, [isCreateFolderOpen, isCreateOpen])
-
-  const fetchFolders = async () => {
+  const fetchFolders = useCallback(async () => {
     setIsLoadingFolders(true)
     try {
       const response = await fetch("/api/folders")
@@ -146,9 +127,9 @@ export default function QRCodesPage() {
     } finally {
       setIsLoadingFolders(false)
     }
-  }
+  }, [])
 
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       const response = await fetch("/api/events/list")
       const data = await response.json()
@@ -158,7 +139,7 @@ export default function QRCodesPage() {
     } catch (error) {
       console.error("Erreur lors du chargement des événements:", error)
     }
-  }
+  }, [])
 
   const fetchQRCodes = useCallback(async () => {
     setIsLoadingQrcodes(true)
@@ -237,6 +218,41 @@ export default function QRCodesPage() {
       setIsLoadingQrcodes(false)
     }
   }, [selectedFolder, debouncedSearch, typeFilter, eventFilter, statusFilter, sortBy, quantity])
+
+  // Charger les dossiers
+  useEffect(() => {
+    fetchFolders()
+    fetchEvents()
+  }, [fetchFolders, fetchEvents])
+
+  // Charger les QR codes quand les filtres changent
+  useEffect(() => {
+    fetchQRCodes()
+  }, [selectedFolder, debouncedSearch, typeFilter, eventFilter, statusFilter, sortBy, quantity, fetchQRCodes])
+
+  // Rafraîchissement automatique en temps réel (toutes les 30 secondes)
+  // Désactivé par défaut pour éviter les rafraîchissements intempestifs
+  // Décommentez pour activer le rafraîchissement automatique
+  /*
+  useEffect(() => {
+    // Ne rafraîchir que si on n'est pas en train de charger
+    if (isLoadingQrcodes) return
+    
+    const interval = setInterval(() => {
+      fetchQRCodes()
+    }, 30000) // Rafraîchir toutes les 30 secondes
+
+    return () => clearInterval(interval)
+  }, [fetchQRCodes, isLoadingQrcodes])
+  */
+
+  // Rafraîchir les dossiers après création/modification
+  useEffect(() => {
+    if (!isCreateFolderOpen && !isCreateOpen) {
+      fetchFolders()
+      fetchQRCodes()
+    }
+  }, [isCreateFolderOpen, isCreateOpen, fetchFolders, fetchQRCodes])
 
   const handleDeleteFolder = async (folderId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce dossier ? Les QR codes qu'il contient ne seront pas supprimés.")) {
@@ -791,7 +807,8 @@ export default function QRCodesPage() {
         <div className="space-y-3">
           {qrcodes.map((qr) => {
             const qrData = qr as any
-            const scanCount = qrData.scanCount || 0
+            // Utiliser scanCount si disponible, sinon utiliser scanned (1 ou 0)
+            const scanCount = qrData.scanCount !== undefined ? qrData.scanCount : (qr.scanned ? 1 : 0)
             const url = qrData.url || ""
             const updatedAt = qrData.updatedAt || qr.createdAt
             

@@ -373,6 +373,52 @@ function NonTemplateContent({ type, originalData }: { type: string; originalData
   }
 }
 
+// Fonction pour tracker le scan d'un QR code
+async function trackScan(qrCodeId: string | null, code: string) {
+  try {
+    if (qrCodeId) {
+      // Utiliser l'ID si disponible (plus fiable)
+      const response = await fetch(`/api/qrcodes/${qrCodeId}/scan`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+      
+      if (!response.ok) {
+        // Si l'ID ne fonctionne pas, essayer avec le code
+        throw new Error("ID scan failed, trying code")
+      }
+      
+      const result = await response.json()
+      if (result.success) {
+        console.log("✅ Scan tracké avec succès (par ID):", qrCodeId)
+        return
+      }
+    }
+    
+    // Fallback : utiliser le code
+    const response = await fetch(`/api/qrcodes/code/${encodeURIComponent(code)}/scan`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Scan tracking failed: ${response.status}`)
+    }
+    
+    const result = await response.json()
+    if (result.success) {
+      console.log("✅ Scan tracké avec succès (par code):", code)
+    }
+  } catch (error) {
+    console.error("❌ Erreur lors du tracking du scan:", error)
+    // Ne pas throw pour ne pas bloquer l'affichage
+  }
+}
+
 export default function QRPublicPage() {
   const params = useParams()
   const qrId = params.id as string
@@ -381,6 +427,7 @@ export default function QRPublicPage() {
   const [qrCodeType, setQrCodeType] = useState<string | null>(null)
   const [qrCodeData, setQrCodeData] = useState<any>(null)
   const [templateData, setTemplateData] = useState<any>(null)
+  const [scanTracked, setScanTracked] = useState(false)
   
   const { setSelectedTemplate, updateGlobalConfig, updateTemplateData } = useQRTemplateStore()
 
@@ -405,6 +452,16 @@ export default function QRPublicPage() {
 
         // Décoder et nettoyer l'ID
         const cleanId = decodedId.trim()
+        
+        // Tracker le scan dès que la page est ouverte (avant le chargement des données)
+        // Cela garantit que le scan est enregistré même si le chargement échoue
+        if (!scanTracked) {
+          setScanTracked(true)
+          // Tracker immédiatement avec le code/ID disponible
+          trackScan(null, cleanId).catch((e) => {
+            console.log("Impossible de tracker le scan initial:", e)
+          })
+        }
         
         // Détecter le type d'identifiant
         // Les codes sont des hex de 32 caractères (16 bytes = 32 hex chars)
@@ -470,22 +527,14 @@ export default function QRPublicPage() {
         setQrCodeData(data.qrCodeData)
         setTemplateData(data.templateData)
 
-        // Mettre à jour le scan du QR code
-        try {
-          if (data.qrCodeId) {
-            // Utiliser l'ID si disponible
-            await fetch(`/api/qrcodes/${data.qrCodeId}/scan`, {
-              method: "PATCH",
-            })
-          } else {
-            // Sinon, utiliser le code
-            await fetch(`/api/qrcodes/code/${encodeURIComponent(decodedId)}/scan`, {
-              method: "PATCH",
-            })
-          }
-        } catch (e) {
-          // Ignorer les erreurs de scan (non bloquant)
-          console.log("Impossible de mettre à jour le scan:", e)
+        // Mettre à jour le scan avec l'ID si disponible (plus fiable que le code)
+        // Le scan initial a déjà été fait avec le code, mais on peut le refaire avec l'ID pour plus de précision
+        if (data.qrCodeId && scanTracked) {
+          // Re-tracker avec l'ID si disponible (plus fiable)
+          trackScan(data.qrCodeId, cleanId).catch((e) => {
+            // Ignorer les erreurs (non bloquant)
+            console.log("Impossible de re-tracker avec l'ID:", e)
+          })
         }
 
         // Si c'est un template, charger les données dans le store
@@ -514,7 +563,8 @@ export default function QRPublicPage() {
     if (qrId) {
       loadQRData()
     }
-  }, [qrId, setSelectedTemplate, updateGlobalConfig, updateTemplateData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrId]) // Ne dépendre que de qrId pour éviter les re-renders infinis
 
   const { selectedTemplate } = useQRTemplateStore()
   const TemplateComponent = selectedTemplate ? getTemplateComponent(selectedTemplate) : null
