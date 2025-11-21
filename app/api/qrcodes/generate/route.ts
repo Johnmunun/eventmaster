@@ -196,41 +196,24 @@ export async function POST(request: NextRequest) {
     const cleanAppUrl = appUrl.replace(/\/$/, '').split('/dashboard')[0].split('/api')[0]
     const qrCodeUrl = `${cleanAppUrl}/qr/${code}`
     
-    // Générer le QR code avec l'URL de redirection
-    // Si une image avec frames est fournie, l'utiliser, sinon générer un QR code basique
+    // TOUJOURS régénérer le QR code côté serveur avec la bonne URL
+    // Même si une image avec frames est fournie, on doit s'assurer que l'URL encodée est correcte
     let qrCodeDataUrl: string
-    if (qrCodeImageFile) {
-      // Utiliser l'image avec frames fournie par le client
-      try {
-        const arrayBuffer = await qrCodeImageFile.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-        qrCodeDataUrl = `data:image/png;base64,${buffer.toString('base64')}`
-      } catch (error) {
-        console.error("Erreur conversion image avec frames:", error)
-        // Fallback: générer un QR code basique
-        try {
-          const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
-          qrCodeDataUrl = result
-        } catch (genError) {
-          console.error("Erreur génération QR code:", genError)
-          return NextResponse.json(
-            { success: false, error: "Impossible de générer le QR code" },
-            { status: 500 }
-          )
-        }
-      }
-    } else {
-      // Générer un QR code basique sans frames
-      try {
-        const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
-        qrCodeDataUrl = result
-      } catch (error) {
-        console.error("Erreur génération QR code:", error)
-        return NextResponse.json(
-          { success: false, error: "Impossible de générer le QR code" },
-          { status: 500 }
-        )
-      }
+    try {
+      // Générer le QR code avec la bonne URL (qrCodeUrl)
+      const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
+      qrCodeDataUrl = result
+      
+      // Si une image avec frames est fournie, on peut l'utiliser pour l'apparence visuelle
+      // mais le QR code doit toujours contenir la bonne URL
+      // Note: Pour l'instant, on génère toujours un nouveau QR code pour garantir la bonne URL
+      // TODO: Implémenter la fusion de l'image frame avec le QR code régénéré si nécessaire
+    } catch (error) {
+      console.error("Erreur génération QR code:", error)
+      return NextResponse.json(
+        { success: false, error: "Impossible de générer le QR code" },
+        { status: 500 }
+      )
     }
 
     // Convertir base64 en Buffer pour ImageKit

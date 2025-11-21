@@ -886,7 +886,17 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       setStep(2)
     } else if (step === 2) {
       // Étape 2 (template) : passer à l'étape 3 (apparence)
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://mon-site-web'
+      // Utiliser NEXT_PUBLIC_APP_URL si disponible, sinon nettoyer window.location.origin
+      let baseUrl = 'http://localhost:3000'
+      if (typeof window !== 'undefined') {
+        if (process.env.NEXT_PUBLIC_APP_URL) {
+          baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+        } else {
+          // Nettoyer window.location.origin pour enlever les chemins incorrects
+          const origin = window.location.origin
+          baseUrl = origin.split('/dashboard')[0].split('/api')[0].replace(/\/$/, '')
+        }
+      }
       const qrCodeId = `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const qrUrl = `${baseUrl}/qr/${qrCodeId}`
       setQrCodeData(qrUrl)
@@ -1061,7 +1071,17 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       // Utiliser l'URL qui a été générée pour l'aperçu (qrCodeData)
       // Cette URL sera mise à jour côté serveur avec le vrai code
       const qrUrl = qrCodeData || (() => {
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://mon-site-web'
+        // Utiliser NEXT_PUBLIC_APP_URL si disponible, sinon nettoyer window.location.origin
+        let baseUrl = 'http://localhost:3000'
+        if (typeof window !== 'undefined') {
+          if (process.env.NEXT_PUBLIC_APP_URL) {
+            baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+          } else {
+            // Nettoyer window.location.origin pour enlever les chemins incorrects
+            const origin = window.location.origin
+            baseUrl = origin.split('/dashboard')[0].split('/api')[0].replace(/\/$/, '')
+          }
+        }
         const tempCode = `temp_${Date.now()}`
         return `${baseUrl}/qr/${tempCode}`
       })()
@@ -2065,7 +2085,17 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
                 onNext={() => {
                   try {
                     // Préparer les données pour l'étape d'apparence
-                    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://mon-site-web'
+                    // Utiliser NEXT_PUBLIC_APP_URL si disponible, sinon nettoyer window.location.origin
+                    let baseUrl = 'http://localhost:3000'
+                    if (typeof window !== 'undefined') {
+                      if (process.env.NEXT_PUBLIC_APP_URL) {
+                        baseUrl = process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+                      } else {
+                        // Nettoyer window.location.origin pour enlever les chemins incorrects
+                        const origin = window.location.origin
+                        baseUrl = origin.split('/dashboard')[0].split('/api')[0].replace(/\/$/, '')
+                      }
+                    }
                     const qrCodeId = `qr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
                     const qrUrl = `${baseUrl}/qr/${qrCodeId}`
                     
