@@ -286,12 +286,14 @@ const urlSchema = z.object({
   url: z.string().url("URL invalide").min(1, "L'URL est requise"),
 })
 
+// PDF : seul le nom est obligatoire (dans customizationForm), le fichier est optionnel
 const pdfSchema = z.object({
-  pdfFile: z.instanceof(File, { message: "Un fichier PDF est requis" }),
+  pdfFile: z.instanceof(File).optional().or(z.any()),
 })
 
+// IMAGE : seul le nom est obligatoire, les images sont optionnelles
 const imageSchema = z.object({
-  images: z.array(z.instanceof(File)).min(1, "Au moins une image est requise"),
+  images: z.array(z.instanceof(File)).optional().or(z.any()),
 })
 
 const videoSchema = z.object({
@@ -494,15 +496,20 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
   // Formulaires par étape
   const contentForm = useForm<any>({
     resolver: zodResolver(getSchemaForType(selectedType)),
+    mode: "onChange", // Valider à chaque changement
   })
 
   // Mettre à jour le resolver quand selectedType change (sans réinitialiser le formulaire)
   useEffect(() => {
     if (selectedType) {
-      // Juste effacer les erreurs, ne pas réinitialiser le formulaire pour éviter le flash
+      // Mettre à jour le resolver avec le nouveau schéma
+      const newSchema = getSchemaForType(selectedType)
       contentForm.clearErrors()
+      // Réinitialiser le resolver avec le nouveau schéma
+      // Note: react-hook-form ne permet pas de changer le resolver dynamiquement
+      // On doit donc s'assurer que le resolver est correct dès le départ
     }
-  }, [selectedType])
+  }, [selectedType, contentForm, getSchemaForType])
 
   const customizationForm = useForm({
     resolver: zodResolver(customizationSchema),
@@ -827,10 +834,24 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       defaultValues.events = [{ time: "", title: "", description: "", location: "" }]
     } else if (type === "FEEDBACK") {
       defaultValues.questions = [{ question: "", type: "rating" }]
+    } else if (type === "TEXT") {
+      // Initialiser avec une valeur par défaut vide pour TEXT
+      defaultValues.text = ""
+    } else if (type === "URL") {
+      defaultValues.url = ""
+    } else if (type === "VIDEO") {
+      defaultValues.videoUrl = ""
     }
     
     // Réinitialiser le formulaire AVANT de changer le type pour éviter le flash
-    contentForm.reset(defaultValues)
+    contentForm.reset(defaultValues, {
+      keepErrors: false,
+      keepDirty: false,
+      keepIsSubmitted: false,
+      keepTouched: false,
+      keepIsValid: false,
+      keepSubmitCount: false,
+    })
     
     // TOUS les types utilisent le système de template
     const templateType = getTemplateForQRType(type)
@@ -882,6 +903,34 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
   const handleSubmitWithAppearance = async (qrCodeImage: string, appearanceConfig: QRAppearanceConfig) => {
     setIsSubmitting(true)
     try {
+      // Valider le formulaire AVANT de récupérer les valeurs
+      // Ne valider que si le type nécessite une validation stricte
+      const typesRequiringValidation = ["URL", "TEXT", "VIDEO", "WHATSAPP", "SOCIAL", "EMAIL", "SMS", "PHONE", "LOCATION", "BITCOIN", "GUEST_CARD"]
+      const needsValidation = selectedType && typesRequiringValidation.includes(selectedType)
+      
+      if (needsValidation) {
+        // Déclencher la validation uniquement pour les champs requis
+        await contentForm.trigger()
+        const hasErrors = Object.keys(contentForm.formState.errors).length > 0
+        
+        // Ne bloquer que si il y a vraiment des erreurs
+        // trigger() peut retourner false même sans erreurs si le formulaire n'est pas initialisé
+        if (hasErrors) {
+          console.error("Erreurs de validation du formulaire:", contentForm.formState.errors)
+          const firstError = Object.values(contentForm.formState.errors)[0] as any
+          const errorMessage = firstError?.message || "Veuillez remplir tous les champs requis"
+          toast.error("Erreur de validation", {
+            description: errorMessage,
+            duration: 4000,
+          })
+          setIsSubmitting(false)
+          return
+        }
+      }
+      
+      // Pour les types qui n'ont pas besoin de validation stricte (PDF, IMAGE, etc.)
+      // On continue sans valider le formulaire
+
       const contentData = contentForm.getValues()
       const customData = customizationForm.getValues()
       
@@ -890,10 +939,13 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         selectedType,
         contentData,
         customData,
-        formErrors: contentForm.formState.errors
+        formErrors: contentForm.formState.errors,
+        textValue: contentData.text,
+        textLength: contentData.text?.length,
+        textTrimmed: contentData.text?.trim(),
       })
       
-      // Validation manuelle pour certains types critiques (toujours valider)
+      // Validation manuelle pour certains types critiques (double vérification)
       if (selectedType) {
         // Valider manuellement les champs requis selon le type
         let hasErrors = false
@@ -907,9 +959,17 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
             }
             break
           case "TEXT":
-            if (!contentData.text || !contentData.text.trim()) {
+            // Vérifier que le texte existe et n'est pas vide après trim
+            const textValue = contentData.text
+            console.log("Validation TEXT - textValue:", textValue, "type:", typeof textValue, "trimmed:", textValue?.trim())
+            if (!textValue || (typeof textValue === 'string' && !textValue.trim())) {
               hasErrors = true
               errorMessage = "Le texte est requis"
+              // Marquer le champ comme erreur dans le formulaire
+              contentForm.setError("text", {
+                type: "manual",
+                message: "Le texte est requis"
+              })
             }
             break
           case "VIDEO":
@@ -919,16 +979,12 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
             }
             break
           case "PDF":
-            if (!contentData.pdfFile) {
-              hasErrors = true
-              errorMessage = "Le fichier PDF est requis"
-            }
+            // PDF : seul le nom est obligatoire (dans customizationForm), le fichier est optionnel
+            // Pas de validation stricte ici, le fichier peut être ajouté plus tard
             break
           case "IMAGE":
-            if (!contentData.images || contentData.images.length === 0) {
-              hasErrors = true
-              errorMessage = "Au moins une image est requise"
-            }
+            // IMAGE : seul le nom est obligatoire, les images sont optionnelles
+            // Pas de validation stricte ici, les images peuvent être ajoutées plus tard
             break
           case "WHATSAPP":
             if (!contentData.phone || !contentData.phone.trim()) {
@@ -1047,8 +1103,105 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         }
       }
 
-      // TOUJOURS utiliser le système de template
-      qrData = qrUrl // Sera remplacé par le vrai code côté serveur
+      // Pour les types qui ne sont pas des templates (URL, TEXT, VIDEO, PDF, IMAGE, etc.)
+      // on doit construire qrData avec les données réelles
+      // Pour les types template (MENU, PROGRAM, etc.), on utilise qrUrl
+      const nonTemplateTypes = ["URL", "TEXT", "VIDEO", "PDF", "IMAGE", "WHATSAPP", "SOCIAL", "EMAIL", "SMS", "PHONE", "LOCATION", "BITCOIN", "WIFI", "VCARD", "GUEST_CARD"]
+      
+      if (nonTemplateTypes.includes(selectedType || "")) {
+        // Construire qrData avec les données réelles selon le type
+        switch (selectedType) {
+          case "TEXT":
+            qrData = contentData.text || ""
+            break
+          case "URL":
+            qrData = contentData.url || ""
+            break
+          case "VIDEO":
+            qrData = contentData.videoUrl || ""
+            break
+          case "PDF":
+            // Pour PDF, le fichier sera uploadé côté serveur
+            // On utilise une URL temporaire qui sera remplacée par l'URL réelle après upload
+            // Si un fichier est fourni, il sera uploadé dans l'API
+            qrData = contentData.pdfUrl || "https://example.com/pdf-placeholder"
+            break
+          case "IMAGE":
+            // Pour IMAGE, les fichiers seront uploadés côté serveur
+            // On utilise une URL temporaire qui sera remplacée par l'URL réelle après upload
+            if (contentData.images && contentData.images.length > 0) {
+              qrData = contentData.imageUrl || "https://example.com/image-placeholder"
+            } else {
+              qrData = contentData.imageUrl || "https://example.com/image-placeholder"
+            }
+            break
+          case "WHATSAPP":
+            const whatsappMessage = contentData.message ? encodeURIComponent(contentData.message) : ""
+            qrData = `https://wa.me/${contentData.phone?.replace(/\D/g, "") || ""}${whatsappMessage ? `?text=${whatsappMessage}` : ""}`
+            break
+          case "SOCIAL":
+            const socialUrls: Record<string, string> = {
+              facebook: `https://facebook.com/${contentData.username || ""}`,
+              instagram: `https://instagram.com/${contentData.username || ""}`,
+              twitter: `https://twitter.com/${contentData.username || ""}`,
+              linkedin: `https://linkedin.com/in/${contentData.username || ""}`,
+              youtube: `https://youtube.com/@${contentData.username || ""}`,
+              tiktok: `https://tiktok.com/@${contentData.username || ""}`,
+            }
+            qrData = socialUrls[contentData.platform || ""] || ""
+            break
+          case "EMAIL":
+            qrData = `mailto:${contentData.email || ""}`
+            break
+          case "SMS":
+            qrData = `sms:${contentData.phone?.replace(/\D/g, "") || ""}`
+            break
+          case "PHONE":
+            qrData = `tel:${contentData.phone?.replace(/\D/g, "") || ""}`
+            break
+          case "LOCATION":
+            qrData = `geo:${contentData.latitude || ""},${contentData.longitude || ""}`
+            break
+          case "BITCOIN":
+            qrData = `bitcoin:${contentData.address || ""}`
+            break
+          case "WIFI":
+            const security = contentData.security || "WPA2"
+            const ssid = contentData.ssid || ""
+            const password = contentData.password || ""
+            qrData = `WIFI:T:${security};S:${ssid};P:${password};;`
+            break
+          case "VCARD":
+            const vcard = [
+              "BEGIN:VCARD",
+              "VERSION:3.0",
+              `FN:${contentData.firstName || ""} ${contentData.lastName || ""}`,
+              `N:${contentData.lastName || ""};${contentData.firstName || ""};;;`,
+              contentData.organization ? `ORG:${contentData.organization}` : "",
+              contentData.jobTitle ? `TITLE:${contentData.jobTitle}` : "",
+              contentData.email ? `EMAIL:${contentData.email}` : "",
+              contentData.phone ? `TEL:${contentData.phone}` : "",
+              contentData.website ? `URL:${contentData.website}` : "",
+              "END:VCARD"
+            ].filter(Boolean).join("\n")
+            qrData = vcard
+            break
+          case "GUEST_CARD":
+            qrData = JSON.stringify({
+              firstName: contentData.firstName || "",
+              lastName: contentData.lastName || "",
+              table: contentData.table || "",
+            })
+            break
+          // PDF et IMAGE seront gérés après l'upload
+          default:
+            qrData = qrUrl
+        }
+      } else {
+        // Pour les types template (MENU, PROGRAM, etc.), utiliser l'URL
+        qrData = qrUrl
+      }
+      
       formData.append("type", selectedType || "URL")
       
       // Gérer les fichiers uploadés (PDF, images) - les ajouter au formData

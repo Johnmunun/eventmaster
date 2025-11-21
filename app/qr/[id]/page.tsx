@@ -1,5 +1,8 @@
 "use client"
 
+// Note: Les Client Components sont déjà dynamiques par défaut dans Next.js
+// Pas besoin d'exporter dynamic ou revalidate (réservés aux Server Components)
+
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { PhoneMockup } from "@/components/qr-templates/phone-mockup"
@@ -538,17 +541,58 @@ export default function QRPublicPage() {
         }
 
         // Si c'est un template, charger les données dans le store
+        // D'abord essayer avec templateData.type, sinon utiliser qrCodeType pour déterminer le template
+        let templateType: TemplateType | null = null
+        
         if (data.templateData && data.templateData.type) {
-          const templateType = data.templateData.type as TemplateType
-          if (templateType) {
-            setSelectedTemplate(templateType)
-            // Charger la configuration globale (couleurs, typographie, etc.)
-            if (data.templateData.globalConfig) {
-              updateGlobalConfig(data.templateData.globalConfig)
-            }
-            // Charger les données spécifiques du template (contenu)
-            if (data.templateData.templateData) {
-              updateTemplateData(data.templateData.templateData)
+          templateType = data.templateData.type as TemplateType
+        } else if (data.qrCodeType) {
+          // Si pas de type dans templateData, déterminer depuis qrCodeType
+          // Mapping des types QR vers les types de template
+          // Utiliser le même mapping que dans qr-generator-drawer.tsx
+          const qrTypeToTemplate: Record<string, TemplateType> = {
+            "URL": "linkpage",
+            "PDF": "linkpage",
+            "IMAGE": "linkpage",
+            "VIDEO": "linkpage",
+            "TEXT": "profil",
+            "GUEST_CARD": "mariage",
+            "WHATSAPP": "whatsapp",
+            "SOCIAL": "profil",
+            "MENU": "linkpage",
+            "WIFI": "wifi",
+            "PROGRAM": "billet",
+            "VCARD": "vcard",
+            "COUPON": "offre",
+            "PLAYLIST": "linkpage",
+            "GALLERY": "linkpage",
+            "FEEDBACK": "linkpage",
+            "LIVE_STREAM": "concert",
+            "EMAIL": "entreprise",
+            "SMS": "profil",
+            "LOCATION": "localisation",
+            "PHONE": "entreprise",
+            "BITCOIN": "linkpage",
+            "EVENTBRITE": "eventticket",
+          }
+          templateType = qrTypeToTemplate[data.qrCodeType] || null
+        }
+        
+        if (templateType) {
+          setSelectedTemplate(templateType)
+          // Charger la configuration globale (couleurs, typographie, etc.)
+          if (data.templateData?.globalConfig) {
+            updateGlobalConfig(data.templateData.globalConfig)
+          }
+          // Charger les données spécifiques du template (contenu)
+          if (data.templateData?.templateData) {
+            updateTemplateData(data.templateData.templateData)
+          } else if (data.qrCodeData) {
+            // Si pas de templateData mais qu'on a qrCodeData, essayer de l'utiliser
+            // Pour certains types, les données peuvent être dans qrCodeData.originalData ou directement
+            const originalData = data.qrCodeData.originalData || data.qrCodeData
+            if (originalData && typeof originalData === 'object') {
+              updateTemplateData(originalData)
             }
           }
         }
