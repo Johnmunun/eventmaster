@@ -39,6 +39,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
+import { FrameSelector } from "@/components/qr-frames/frame-selector"
+import { QRWithFrameSimple } from "@/components/qr-frames/qr-with-frame"
+import { FrameConfig, QR_FRAMES, getFrameById } from "@/lib/qr-frames"
 // Import dynamique de qrcode pour éviter les problèmes SSR
 let QRCodeLib: any = null
 if (typeof window !== 'undefined') {
@@ -54,7 +57,7 @@ interface QRAppearanceStepProps {
 }
 
 export interface QRAppearanceConfig {
-  frameStyle: string | null
+  frameStyle: string | null // ID du frame (ex: "bag-1", "gift-1", etc.) ou null
   frameText: string
   frameColor: string
   frameUseGradient: boolean
@@ -91,8 +94,9 @@ const CORNER_STYLES = ["square", "rounded", "extra-rounded"]
 
 export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepProps) {
   const [viewMode, setViewMode] = useState<'preview' | 'qrcode'>('qrcode')
+  const [selectedFrame, setSelectedFrame] = useState<FrameConfig | null>(null)
   const [appearanceConfig, setAppearanceConfig] = useState<QRAppearanceConfig>({
-    frameStyle: "none",
+    frameStyle: null, // null = aucun frame, sinon ID du frame (ex: "bag-1")
     frameText: "Scanne-moi!",
     frameColor: "#000000",
     frameUseGradient: false,
@@ -112,6 +116,19 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
   const [isLoadingFolders, setIsLoadingFolders] = useState(false)
+
+  // Synchroniser selectedFrame avec frameStyle
+  useEffect(() => {
+    if (appearanceConfig.frameStyle && appearanceConfig.frameStyle !== "none") {
+      const frame = getFrameById(appearanceConfig.frameStyle)
+      setSelectedFrame(frame || null)
+      if (frame?.defaultColor) {
+        setAppearanceConfig(prev => ({ ...prev, frameColor: frame.defaultColor || prev.frameColor }))
+      }
+    } else {
+      setSelectedFrame(null)
+    }
+  }, [appearanceConfig.frameStyle])
 
   // Charger les dossiers
   useEffect(() => {
@@ -759,42 +776,24 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
             collapsible={false}
           >
             <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium mb-3 block">Style de cadre</Label>
-                <div className="grid grid-cols-4 gap-3">
-                  {FRAME_STYLES.map((frame) => {
-                    const IconComponent = frame.icon
-                    return (
-                      <button
-                        key={frame.id}
-                        type="button"
-                        onClick={() => setAppearanceConfig({ ...appearanceConfig, frameStyle: frame.id === "none" ? null : frame.id })}
-                        className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                          (appearanceConfig.frameStyle === frame.id || (frame.id === "none" && appearanceConfig.frameStyle === null))
-                            ? "border-primary bg-primary/10 dark:bg-primary/20"
-                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                        }`}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                            <IconComponent className="h-6 w-6" />
-                          </div>
-                          <span className="text-xs text-center">{frame.label}</span>
-                        </div>
-                        {(appearanceConfig.frameStyle === frame.id || (frame.id === "none" && appearanceConfig.frameStyle === null)) && (
-                          <div className="absolute top-1 right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-sm">
-                            <Check className="h-3 w-3 text-white" />
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+              <FrameSelector
+                selectedFrame={selectedFrame}
+                onFrameSelect={(frame) => {
+                  setSelectedFrame(frame)
+                  setAppearanceConfig({ 
+                    ...appearanceConfig, 
+                    frameStyle: frame?.id || null,
+                    frameColor: frame?.defaultColor || appearanceConfig.frameColor
+                  })
+                }}
+                frameColor={appearanceConfig.frameColor}
+                onColorChange={(color) => {
+                  setAppearanceConfig({ ...appearanceConfig, frameColor: color })
+                }}
+              />
 
               {/* Texte encadré - seulement si un cadre est sélectionné */}
-              {appearanceConfig.frameStyle && appearanceConfig.frameStyle !== "none" && (
+              {selectedFrame && (
                 <div>
                   <Label className="text-sm font-medium mb-2 block">Texte encadré</Label>
                   <div className="relative">
@@ -810,8 +809,8 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                 </div>
               )}
 
-              {/* Couleur du cadre - seulement si un cadre est sélectionné */}
-              {appearanceConfig.frameStyle && appearanceConfig.frameStyle !== "none" && (
+              {/* Couleur du cadre - seulement si un cadre est sélectionné et supporte le changement de couleur */}
+              {selectedFrame && selectedFrame.supportsColorChange && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Utiliser un dégradé de couleurs pour le cadre</Label>
@@ -843,7 +842,7 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
               )}
 
               {/* Couleur d'arrière-plan du cadre - seulement si un cadre est sélectionné */}
-              {appearanceConfig.frameStyle && appearanceConfig.frameStyle !== "none" && (
+              {selectedFrame && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -1021,12 +1020,38 @@ export function QRAppearanceStep({ qrData, onBack, onCreate }: QRAppearanceStepP
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                       <p className="text-sm text-gray-500">Génération...</p>
                     </div>
-                  ) : qrCodeImage ? (
-                    <img 
-                      src={qrCodeImage} 
-                      alt="QR Code" 
-                      className="max-w-full max-h-full object-contain"
-                    />
+                  ) : qrCodeImage || qrData ? (
+                    // Utiliser QRWithFrameSimple si un frame est sélectionné, sinon utiliser l'image générée
+                    selectedFrame ? (
+                      <div className="flex items-center justify-center w-full h-full">
+                        <QRWithFrameSimple
+                          frame={selectedFrame}
+                          value={qrData}
+                          frameColor={appearanceConfig.frameColor}
+                          size={280}
+                          qrColor={appearanceConfig.foregroundColor}
+                          qrBackgroundColor={appearanceConfig.backgroundColor}
+                          errorCorrectionLevel="H"
+                        />
+                      </div>
+                    ) : qrCodeImage ? (
+                      <img 
+                        src={qrCodeImage} 
+                        alt="QR Code" 
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full">
+                        <QRWithFrameSimple
+                          frame={null}
+                          value={qrData}
+                          size={280}
+                          qrColor={appearanceConfig.foregroundColor}
+                          qrBackgroundColor={appearanceConfig.backgroundColor}
+                          errorCorrectionLevel="H"
+                        />
+                      </div>
+                    )
                   ) : (
                     <div className="text-center text-gray-400">
                       <QrCode className="h-16 w-16 mx-auto mb-2" />

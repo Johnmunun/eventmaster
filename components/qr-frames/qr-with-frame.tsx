@@ -297,9 +297,17 @@ export function QRWithFrameSimple({
               : undefined,
           }}
           onError={(e) => {
-            console.error(`Erreur lors du chargement de l'image: ${frame.filename}`)
+            console.error(`Erreur lors du chargement de l'image: /frames/${frame.filename}`)
             const target = e.target as HTMLImageElement
             target.style.display = "none"
+            // Afficher un message d'erreur
+            const parent = target.parentElement
+            if (parent) {
+              parent.innerHTML = `<div class="flex items-center justify-center h-full text-xs text-red-500">Image non trouvée: ${frame.filename}</div>`
+            }
+          }}
+          onLoad={() => {
+            console.log(`Image chargée avec succès: /frames/${frame.filename}`)
           }}
         />
       </div>

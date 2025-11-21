@@ -1,11 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { FrameConfig, QR_FRAMES, getCategories } from "@/lib/qr-frames"
 import { Button } from "@/components/ui/button"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import Image from "next/image"
 import { Check } from "lucide-react"
 
 interface FrameSelectorProps {
@@ -28,6 +27,11 @@ export function FrameSelector({
     selectedCategory === "all"
       ? QR_FRAMES
       : QR_FRAMES.filter((frame) => frame.category === selectedCategory)
+
+  // Debug: Log des frames disponibles
+  useEffect(() => {
+    console.log("FrameSelector - Frames disponibles:", filteredFrames.length, filteredFrames.map(f => f.filename))
+  }, [filteredFrames])
 
   return (
     <div className="space-y-4">
@@ -104,7 +108,12 @@ export function FrameSelector({
           </button>
 
           {/* Cadres */}
-          {filteredFrames.map((frame) => {
+          {filteredFrames.length === 0 ? (
+            <div className="flex items-center justify-center w-full py-8 text-sm text-muted-foreground">
+              Aucun cadre disponible. Ajoutez des images dans /public/frames/
+            </div>
+          ) : (
+            filteredFrames.map((frame) => {
             const isSelected = selectedFrame?.id === frame.id
             return (
               <button
@@ -121,11 +130,9 @@ export function FrameSelector({
               >
                 {/* Image du cadre */}
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-                  <Image
+                  <img
                     src={`/frames/${frame.filename}`}
                     alt={frame.name}
-                    width={96}
-                    height={96}
                     className="w-full h-full object-contain"
                     style={{
                       filter: frame.supportsColorChange && frameColor
@@ -134,12 +141,16 @@ export function FrameSelector({
                     }}
                     onError={(e) => {
                       // Fallback si l'image n'existe pas
+                      console.error(`Image non trouvée: /frames/${frame.filename}`)
                       const target = e.target as HTMLImageElement
                       target.style.display = "none"
                       const parent = target.parentElement
                       if (parent) {
-                        parent.innerHTML = `<div class="text-xs text-center p-2">${frame.name}</div>`
+                        parent.innerHTML = `<div class="text-xs text-center p-2 text-gray-600 dark:text-gray-400">${frame.name}</div>`
                       }
+                    }}
+                    onLoad={() => {
+                      console.log(`Image chargée avec succès: /frames/${frame.filename}`)
                     }}
                   />
                 </div>
@@ -157,7 +168,7 @@ export function FrameSelector({
                 </div>
               </button>
             )
-          })}
+          }))}
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
