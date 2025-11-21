@@ -6,10 +6,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Assurer que les routes dynamiques ne sont pas pré-rendues
-  experimental: {
-    dynamicIO: true,
-  },
-}
+};
 
-export default nextConfig
+export default nextConfig;

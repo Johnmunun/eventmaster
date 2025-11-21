@@ -10,8 +10,16 @@ import { Prisma } from "@prisma/client"
 // Charger les variables d'environnement
 dotenv.config({ path: '.env' })
 
+// Initialiser l'adapter seulement si la base de données est disponible
+let adapter: any = undefined
+try {
+  adapter = PrismaAdapter(db) as any
+} catch (error) {
+  console.warn("PrismaAdapter initialization failed, using JWT-only mode:", error)
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(db) as any,
+  ...(adapter ? { adapter } : {}),
   providers: [
     Credentials({
       name: "Credentials",
@@ -103,7 +111,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
   trustHost: true, // Nécessaire pour Next.js 16
+  // Configuration de l'URL de base pour NextAuth v5
+  basePath: "/api/auth",
 })
 

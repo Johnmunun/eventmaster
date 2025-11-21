@@ -181,8 +181,20 @@ export async function POST(request: NextRequest) {
 
     // Construire l'URL finale pour le QR code
     // TOUS les QR codes doivent pointer vers /qr/${code} pour afficher le contenu dynamiquement
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'
-    const qrCodeUrl = `${appUrl}/qr/${code}`
+    // Utiliser l'URL de la requête pour obtenir le bon domaine
+    let protocol = request.headers.get('x-forwarded-proto') || 'https'
+    const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || 'localhost:3000'
+    
+    // En développement local, utiliser http
+    if (host.includes('localhost') || host.includes('127.0.0.1')) {
+      protocol = 'http'
+    }
+    
+    // Si NEXT_PUBLIC_APP_URL est défini, l'utiliser en priorité
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`
+    // Nettoyer l'URL (enlever les trailing slashes et chemins incorrects)
+    const cleanAppUrl = appUrl.replace(/\/$/, '').split('/dashboard')[0].split('/api')[0]
+    const qrCodeUrl = `${cleanAppUrl}/qr/${code}`
     
     // Générer le QR code avec l'URL de redirection
     // Si une image avec frames est fournie, l'utiliser, sinon générer un QR code basique
