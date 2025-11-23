@@ -21,6 +21,7 @@ export function FrameSelector({
   onColorChange,
 }: FrameSelectorProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [availableFrames, setAvailableFrames] = useState<Set<string>>(new Set())
   const categories = ["all", ...getCategories()]
 
   const filteredFrames =
@@ -28,9 +29,10 @@ export function FrameSelector({
       ? QR_FRAMES
       : QR_FRAMES.filter((frame) => frame.category === selectedCategory)
 
-  // Debug: Log des frames disponibles
+  // Vérifier quelles images sont disponibles (optionnel, pour debug)
   useEffect(() => {
-    console.log("FrameSelector - Frames disponibles:", filteredFrames.length, filteredFrames.map(f => f.filename))
+    // Ne pas logger par défaut pour éviter le spam
+    // console.log("FrameSelector - Frames disponibles:", filteredFrames.length)
   }, [filteredFrames])
 
   return (
@@ -118,13 +120,24 @@ export function FrameSelector({
             return (
               <button
                 key={frame.id}
-                onClick={() => onFrameSelect(frame)}
+                onClick={() => {
+                  // Permettre la sélection si l'image est disponible ou si on n'a pas encore vérifié
+                  // On désactive seulement si on sait que l'image n'existe pas
+                  const isUnavailable = availableFrames.size > 0 && !availableFrames.has(frame.id)
+                  if (!isUnavailable) {
+                    onFrameSelect(frame)
+                  }
+                }}
                 className={cn(
                   "flex-shrink-0 w-24 h-24 rounded-lg border-2 transition-all relative overflow-hidden",
                   "hover:border-primary hover:shadow-md group",
                   isSelected
                     ? "border-primary shadow-md ring-2 ring-primary/20"
-                    : "border-gray-200 dark:border-gray-700"
+                    : "border-gray-200 dark:border-gray-700",
+                  // Désactiver visuellement seulement si on sait que l'image n'existe pas
+                  availableFrames.size > 0 && !availableFrames.has(frame.id)
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer"
                 )}
                 title={frame.name}
               >
@@ -135,22 +148,39 @@ export function FrameSelector({
                     alt={frame.name}
                     className="w-full h-full object-contain"
                     style={{
-                      filter: frame.supportsColorChange && frameColor
-                        ? `brightness(0) saturate(100%) ${frameColorToFilter(frameColor)}`
-                        : undefined,
+                      // Appliquer le filtre de couleur seulement si supporté et si une couleur est fournie
+                      // Ne pas appliquer de filtre par défaut pour que l'image soit visible
+                      filter: frame.supportsColorChange && frameColor && frameColor !== "#000000"
+                        ? createColorFilter(frameColor)
+                        : "none",
+                      opacity: 1, // S'assurer que l'image est visible
+                      display: "block", // S'assurer que l'image est affichée
                     }}
                     onError={(e) => {
-                      // Fallback si l'image n'existe pas
-                      console.error(`Image non trouvée: /frames/${frame.filename}`)
+                      // Gérer gracieusement les images manquantes sans erreur console
                       const target = e.target as HTMLImageElement
                       target.style.display = "none"
                       const parent = target.parentElement
                       if (parent) {
-                        parent.innerHTML = `<div class="text-xs text-center p-2 text-gray-600 dark:text-gray-400">${frame.name}</div>`
+                        // Afficher un placeholder au lieu de l'image
+                        parent.innerHTML = `
+                          <div class="flex flex-col items-center justify-center h-full p-2 text-center">
+                            <div class="text-2xl mb-1">📦</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 leading-tight">${frame.name}</div>
+                            <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Non disponible</div>
+                          </div>
+                        `
+                        // Marquer ce frame comme non disponible
+                        setAvailableFrames(prev => {
+                          const next = new Set(prev)
+                          next.delete(frame.id)
+                          return next
+                        })
                       }
                     }}
                     onLoad={() => {
-                      console.log(`Image chargée avec succès: /frames/${frame.filename}`)
+                      // Marquer ce frame comme disponible
+                      setAvailableFrames(prev => new Set(prev).add(frame.id))
                     }}
                   />
                 </div>
@@ -176,15 +206,20 @@ export function FrameSelector({
   )
 }
 
-// Helper pour convertir une couleur hex en filtre CSS
-function frameColorToFilter(hex: string): string {
+// Helper pour créer un filtre de couleur CSS qui ne cache pas l'image
+function createColorFilter(hex: string): string {
   const rgb = hexToRgb(hex)
   if (!rgb) return ""
   
-  // Créer un filtre qui colore l'image
-  // Cette approche utilise un filtre CSS complexe pour changer la couleur
-  // Note: Ce n'est pas parfait, mais fonctionne pour la plupart des cas
-  return `invert(${rgb.r / 255}) sepia(1) saturate(${rgb.g / 255}) hue-rotate(${rgb.b}deg)`
+  // Utiliser un filtre qui teinte l'image sans la rendre invisible
+  // Cette approche fonctionne mieux avec des images en niveaux de gris
+  const r = rgb.r / 255
+  const g = rgb.g / 255
+  const b = rgb.b / 255
+  
+  // Créer une matrice de couleur pour teinter l'image
+  // Ne pas utiliser brightness(0) qui rend l'image invisible
+  return `brightness(0.8) saturate(100%) invert(${1 - r}) sepia(100%) saturate(${g * 100}%) hue-rotate(${b * 360}deg)`
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {

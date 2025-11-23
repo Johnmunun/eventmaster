@@ -40,8 +40,8 @@ export function OffreForm() {
               handleChange('image', null)
             }
           }}
-          onRemove={() => handleChange('image', null)}
-        />
+            onRemove={() => handleChange('image', null)}
+          />
       </div>
 
       <div>

@@ -237,17 +237,17 @@ export default function EventsPage() {
   const hasActiveFilters = searchQuery || statusFilter || typeFilter || sortBy !== "date" || sortOrder !== "asc"
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* En-tête de la page */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Événements</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Événements</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
             {pagination ? `${pagination.total} événement${pagination.total > 1 ? 's' : ''}` : "Gérez tous vos événements en un seul endroit"}
           </p>
         </div>
         {/* Bouton pour ouvrir le drawer de création */}
-        <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+        <Button onClick={() => setIsCreateOpen(true)} className="gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Créer un événement
         </Button>
@@ -281,10 +281,10 @@ export default function EventsPage() {
             </div>
 
             {/* Ligne 2: Filtres */}
-            <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
               {/* Filtre par statut */}
               <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[180px] border-2">
+                <SelectTrigger className="w-full sm:w-[180px] border-2">
                   <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
                 <SelectContent>
@@ -298,7 +298,7 @@ export default function EventsPage() {
 
               {/* Filtre par type */}
               <Select value={typeFilter || "all"} onValueChange={(value) => setTypeFilter(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[180px] border-2">
+                <SelectTrigger className="w-full sm:w-[180px] border-2">
                   <SelectValue placeholder="Tous les types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -314,7 +314,7 @@ export default function EventsPage() {
 
               {/* Tri */}
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[150px] border-2">
+                <SelectTrigger className="w-full sm:w-[150px] border-2">
                   <SelectValue placeholder="Trier par" />
                 </SelectTrigger>
                 <SelectContent>
@@ -352,25 +352,25 @@ export default function EventsPage() {
 
       {/* Grille des événements */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
       ) : events.length === 0 ? (
         <Card className="border-2 border-dashed">
-          <CardContent className="p-12 text-center">
-            <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          <CardContent className="p-8 sm:p-12 text-center">
+            <Calendar className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Aucun événement trouvé
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4">
               {hasActiveFilters 
                 ? "Essayez de modifier vos filtres de recherche"
                 : "Commencez par créer votre premier événement"}
             </p>
             {!hasActiveFilters && (
-              <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+              <Button onClick={() => setIsCreateOpen(true)} className="gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
                 Créer un événement
               </Button>
@@ -379,7 +379,7 @@ export default function EventsPage() {
         </Card>
       ) : (
         <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {events.map((event) => {
               const eventDate = new Date(event.date)
               const formattedDate = eventDate.toLocaleDateString("fr-FR", {
@@ -480,11 +480,11 @@ export default function EventsPage() {
           {pagination && pagination.totalPages > 1 && (
             <Card className="border-2 border-primary/10">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
                     Page {pagination.page} sur {pagination.totalPages} • {pagination.total} événement{pagination.total > 1 ? 's' : ''}
               </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"

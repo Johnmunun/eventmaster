@@ -51,8 +51,8 @@ export function YouTubeForm() {
               handleChange('thumbnail', null)
             }
           }}
-          onRemove={() => handleChange('thumbnail', null)}
-        />
+            onRemove={() => handleChange('thumbnail', null)}
+          />
       </div>
     </div>
   )

@@ -202,8 +202,8 @@ export function EventTicketForm() {
               handleChange('coverImage', null)
             }
           }}
-          onRemove={() => handleChange('coverImage', null)}
-        />
+            onRemove={() => handleChange('coverImage', null)}
+          />
       </div>
 
       {data.eventId && guests.length > 0 && (

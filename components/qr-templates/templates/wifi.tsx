@@ -39,59 +39,59 @@ export function WifiTemplate() {
         <div className="mb-16 flex items-center justify-center relative">
           <div className="absolute inset-0 bg-blue-100 rounded-full blur-2xl opacity-50 animate-pulse"></div>
           <div className="relative">
-            <svg 
+          <svg 
               width="120" 
               height="120" 
-              viewBox="0 0 100 100" 
-              fill="none" 
-              xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 100 100" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
               className="text-blue-500"
-            >
-              {/* Point central (en bas) */}
-              <circle
-                cx="50"
-                cy="85"
+          >
+            {/* Point central (en bas) */}
+            <circle
+              cx="50"
+              cy="85"
                 r="3"
-                fill="currentColor"
+              fill="currentColor"
                 opacity="0.6"
-              />
-              {/* Arc 1 (le plus petit, en haut) */}
-              <path
-                d="M 45 75 Q 50 70 55 75"
-                stroke="currentColor"
+            />
+            {/* Arc 1 (le plus petit, en haut) */}
+            <path
+              d="M 45 75 Q 50 70 55 75"
+              stroke="currentColor"
                 strokeWidth="4"
-                strokeLinecap="round"
-                fill="none"
+              strokeLinecap="round"
+              fill="none"
                 opacity="0.7"
-              />
-              {/* Arc 2 */}
-              <path
-                d="M 35 80 Q 50 60 65 80"
-                stroke="currentColor"
+            />
+            {/* Arc 2 */}
+            <path
+              d="M 35 80 Q 50 60 65 80"
+              stroke="currentColor"
                 strokeWidth="4"
-                strokeLinecap="round"
-                fill="none"
+              strokeLinecap="round"
+              fill="none"
                 opacity="0.8"
-              />
-              {/* Arc 3 */}
-              <path
-                d="M 25 85 Q 50 50 75 85"
-                stroke="currentColor"
+            />
+            {/* Arc 3 */}
+            <path
+              d="M 25 85 Q 50 50 75 85"
+              stroke="currentColor"
                 strokeWidth="4"
-                strokeLinecap="round"
-                fill="none"
+              strokeLinecap="round"
+              fill="none"
                 opacity="0.9"
-              />
-              {/* Arc 4 (le plus grand) */}
-              <path
-                d="M 15 90 Q 50 40 85 90"
-                stroke="currentColor"
+            />
+            {/* Arc 4 (le plus grand) */}
+            <path
+              d="M 15 90 Q 50 40 85 90"
+              stroke="currentColor"
                 strokeWidth="4"
-                strokeLinecap="round"
-                fill="none"
+              strokeLinecap="round"
+              fill="none"
                 opacity="1"
-              />
-            </svg>
+            />
+          </svg>
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export function WifiTemplate() {
             <Wifi className="w-5 h-5 text-gray-600" />
             <p className="text-lg text-gray-900 font-semibold" style={typographyStyle}>
               {data.networkName || "Nom du réseau"}
-            </p>
+          </p>
           </div>
         </div>
 

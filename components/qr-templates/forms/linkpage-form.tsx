@@ -51,8 +51,8 @@ export function LinkPageForm() {
               handleChange('image', null)
             }
           }}
-          onRemove={() => handleChange('image', null)}
-        />
+            onRemove={() => handleChange('image', null)}
+          />
       </div>
 
       <div>

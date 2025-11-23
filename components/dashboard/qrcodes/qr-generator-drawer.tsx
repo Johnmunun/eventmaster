@@ -49,7 +49,8 @@ import {
   Building,
   MapPin,
   Bitcoin,
-  Ticket
+  Ticket,
+  Eye
 } from 'lucide-react'
 import {
   Sheet,
@@ -58,6 +59,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -445,6 +452,7 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
   const [qrCodeData, setQrCodeData] = useState<string>("") // Données pour l'étape d'apparence
   const [appearanceConfig, setAppearanceConfig] = useState<QRAppearanceConfig | null>(null)
+  const [showPreview, setShowPreview] = useState(false) // État pour afficher/masquer le phone mockup
   const [landingPageConfig, setLandingPageConfig] = useState({
     backgroundColor: "#527AC9",
     textColor: "#FFFFFF",
@@ -550,6 +558,7 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       setQrPreview(null)
       setLogoPreview(null)
       setQrCodeData("")
+      setShowPreview(false)
       contentForm.reset()
       customizationForm.reset()
     }
@@ -1906,49 +1915,56 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         <div className="space-y-6 order-2 lg:order-1 flex flex-col h-full min-h-0">
           {/* Section sélection de type */}
           <div className="flex-shrink-0">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              1. Type et contenu
+            <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              {selectedType ? "2. Ajoutez du contenu à votre code QR" : "1. Sélectionnez un type de code QR"}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {selectedType ? "Remplissez les informations ci-dessous" : "Sélectionnez le type de contenu"}
+              {selectedType ? "Remplissez les informations ci-dessous" : "Choisissez le type de contenu pour votre QR code"}
             </p>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto pr-2 drawer-scrollbar space-y-6">
-            {/* Grille de sélection des types */}
+            {/* Liste verticale de sélection des types - Style inspiré de QRgenerator.ai */}
             {!selectedType ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-3">
                 {QR_TYPES.map((type) => {
                   const hasTemplate = getTemplateForQRType(type.id) !== null
                   return (
                     <Card
                       key={type.id}
-                      className={`cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg ${
+                      className={`cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-2xl ${
                         selectedType === type.id
                           ? "ring-2 ring-primary shadow-lg"
                           : "hover:border-primary/50"
                       }`}
                       onClick={() => handleTypeSelect(type.id)}
                     >
-                      <CardContent className="p-4 flex flex-col items-center justify-center space-y-2 h-full">
-                        <div
-                          className={`p-3 rounded-lg bg-gradient-to-br ${type.color} text-white shadow-md`}
-                        >
-                          {type.icon}
+                      <CardContent className="p-4 md:p-5">
+                        <div className="flex items-center gap-4">
+                          {/* Icône avec fond coloré */}
+                          <div
+                            className={`flex-shrink-0 p-3 rounded-xl bg-gradient-to-br ${type.color} text-white shadow-md`}
+                          >
+                            {type.icon}
+                          </div>
+                          
+                          {/* Titre et description */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-base text-gray-900 dark:text-white mb-1">
+                              {type.label}
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {type.description}
+                            </p>
+                          </div>
+                          
+                          {/* Badge template si disponible */}
+                          {hasTemplate && (
+                            <Badge className="flex-shrink-0 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                              📱 Template
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-center">
-                          <p className="font-semibold text-sm text-gray-900 dark:text-white">
-                            {type.label}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {type.description}
-                          </p>
-                        </div>
-                        {hasTemplate && (
-                          <Badge className="mt-1 bg-green-500 text-white text-xs">
-                            📱 Template
-                          </Badge>
-                        )}
                       </CardContent>
                     </Card>
                   )
@@ -1992,8 +2008,8 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
           </div>
         </div>
 
-        {/* Colonne droite : Preview mobile avec template */}
-        <div className="order-1 lg:order-2 flex items-start justify-center lg:sticky lg:top-0">
+        {/* Colonne droite : Preview mobile avec template - Masqué sur mobile */}
+        <div className="hidden lg:flex order-1 lg:order-2 items-start justify-center lg:sticky lg:top-0">
           {selectedType && TemplateComponent ? (
             <PhoneMockup width={280} height={560}>
               <TemplateComponent />
@@ -2076,10 +2092,10 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
         )}
 
         {/* Contenu scrollable */}
-        <div className={`flex-1 min-h-0 ${step === 3 ? 'overflow-hidden p-0' : 'overflow-y-auto px-6 py-6 drawer-scrollbar'}`}>
+        <div className={`flex-1 min-h-0 ${step === 3 ? 'overflow-hidden p-0' : 'overflow-y-auto px-6 py-6 drawer-scrollbar'} ${step === 2 ? 'pb-24' : ''}`}>
           {step === 1 && renderStep1()}
           {step === 2 && selectedType && (
-            <div className="h-full">
+            <div className="min-h-full">
               {/* TemplateBuilder pour la personnalisation */}
               <TemplateBuilder 
                 onNext={() => {
@@ -2144,29 +2160,75 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
 
         {/* Footer avec navigation - pas à l'étape 4 */}
         {step !== 4 && step !== 3 && (
-          <div className="relative flex-shrink-0 border-t border-primary/10 px-6 py-5 bg-gradient-to-r from-white via-primary/5 to-accent/5 dark:from-gray-900 dark:via-primary/10 dark:to-accent/10 backdrop-blur-sm">
-            <div className="flex gap-3 relative z-10">
+          <div className="relative flex-shrink-0 border-t border-primary/10 px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-white via-primary/5 to-accent/5 dark:from-gray-900 dark:via-primary/10 dark:to-accent/10 backdrop-blur-sm z-20">
+            <div className="flex gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
               {step > 1 && (
                 <Button
                   variant="outline"
                   onClick={handleBack}
-                  className="flex-1 h-11"
+                  className="flex-1 sm:flex-initial min-w-[120px] h-11 text-sm sm:text-base"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Précédent
+                  <span className="hidden sm:inline">Précédent</span>
+                  <span className="sm:hidden">Préc.</span>
+                </Button>
+              )}
+              {/* Bouton Aperçu à l'étape 2 - Mobile uniquement */}
+              {step === 2 && selectedType && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="h-11 border-2 border-primary/50 hover:border-primary hover:bg-primary/5 flex-shrink-0 lg:hidden"
+                >
+                  <Eye className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Aperçu</span>
                 </Button>
               )}
               {step < totalSteps && (
                 <Button
                   onClick={handleNext}
-                  className="flex-1 h-11 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl"
+                  className="flex-1 lg:flex-initial lg:min-w-[140px] min-w-[120px] h-11 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl text-sm sm:text-base"
                 >
-                  Suivant
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  <span className="hidden sm:inline">Suivant</span>
+                  <span className="sm:hidden">Next</span>
+                  <ArrowRight className="h-4 w-4 sm:ml-2 ml-1" />
                 </Button>
               )}
             </div>
           </div>
+        )}
+
+        {/* Modal d'aperçu pour mobile - Étape 2 */}
+        {step === 2 && selectedType && (
+          <Dialog open={showPreview} onOpenChange={setShowPreview}>
+            <DialogContent className="max-w-[90vw] sm:max-w-md p-0 bg-transparent border-none">
+              <DialogHeader className="sr-only">
+                <DialogTitle>Aperçu du template</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center justify-center">
+                {(() => {
+                  const templateType = getTemplateForQRType(selectedType)
+                  const TemplateComponent = templateType ? getTemplateComponent(templateType) : null
+                  return TemplateComponent ? (
+                    <PhoneMockup width={280} height={560}>
+                      <TemplateComponent />
+                    </PhoneMockup>
+                  ) : (
+                    <div className="relative w-[280px] h-[560px] bg-gray-900 rounded-[3rem] p-2 shadow-2xl">
+                      <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative">
+                        <div className="h-full flex items-center justify-center p-6">
+                          <div className="text-center text-gray-400">
+                            <QrCode className="h-24 w-24 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Aperçu non disponible</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </SheetContent>
     </Sheet>

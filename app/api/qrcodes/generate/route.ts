@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
     console.log("API - Type:", type, "Name:", name, "Data (premiers 100 chars):", data?.substring(0, 100))
 
     // Vérifier que le dossier appartient à l'utilisateur si fourni
-    if (folderId) {
+    // Ne pas vérifier si folderId est vide, null ou "none"
+    if (folderId && folderId.trim() !== "" && folderId !== "none") {
       const folder = await db.folder.findFirst({
         where: {
           id: folderId,
@@ -181,39 +182,44 @@ export async function POST(request: NextRequest) {
 
     // Construire l'URL finale pour le QR code
     // TOUS les QR codes doivent pointer vers /qr/${code} pour afficher le contenu dynamiquement
-    // Utiliser l'URL de la requête pour obtenir le bon domaine
-    let protocol = request.headers.get('x-forwarded-proto') || 'https'
-    const host = request.headers.get('host') || request.headers.get('x-forwarded-host') || 'localhost:3000'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'
+    const qrCodeUrl = `${appUrl}/qr/${code}`
     
-    // En développement local, utiliser http
-    if (host.includes('localhost') || host.includes('127.0.0.1')) {
-      protocol = 'http'
-    }
-    
-    // Si NEXT_PUBLIC_APP_URL est défini, l'utiliser en priorité
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`
-    // Nettoyer l'URL (enlever les trailing slashes et chemins incorrects)
-    const cleanAppUrl = appUrl.replace(/\/$/, '').split('/dashboard')[0].split('/api')[0]
-    const qrCodeUrl = `${cleanAppUrl}/qr/${code}`
-    
-    // TOUJOURS régénérer le QR code côté serveur avec la bonne URL
-    // Même si une image avec frames est fournie, on doit s'assurer que l'URL encodée est correcte
+    // Générer le QR code avec l'URL de redirection
+    // Si une image avec frames est fournie, l'utiliser, sinon générer un QR code basique
     let qrCodeDataUrl: string
-    try {
-      // Générer le QR code avec la bonne URL (qrCodeUrl)
-      const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
-      qrCodeDataUrl = result
-      
-      // Si une image avec frames est fournie, on peut l'utiliser pour l'apparence visuelle
-      // mais le QR code doit toujours contenir la bonne URL
-      // Note: Pour l'instant, on génère toujours un nouveau QR code pour garantir la bonne URL
-      // TODO: Implémenter la fusion de l'image frame avec le QR code régénéré si nécessaire
-    } catch (error) {
-      console.error("Erreur génération QR code:", error)
-      return NextResponse.json(
-        { success: false, error: "Impossible de générer le QR code" },
-        { status: 500 }
-      )
+    if (qrCodeImageFile) {
+      // Utiliser l'image avec frames fournie par le client
+      try {
+        const arrayBuffer = await qrCodeImageFile.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        qrCodeDataUrl = `data:image/png;base64,${buffer.toString('base64')}`
+      } catch (error) {
+        console.error("Erreur conversion image avec frames:", error)
+        // Fallback: générer un QR code basique
+        try {
+          const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
+          qrCodeDataUrl = result
+        } catch (genError) {
+          console.error("Erreur génération QR code:", genError)
+          return NextResponse.json(
+            { success: false, error: "Impossible de générer le QR code" },
+            { status: 500 }
+          )
+        }
+      }
+    } else {
+      // Générer un QR code basique sans frames
+      try {
+        const result = await QRCode.toDataURL(qrCodeUrl, qrCodeOptions) as unknown as string
+        qrCodeDataUrl = result
+      } catch (error) {
+        console.error("Erreur génération QR code:", error)
+        return NextResponse.json(
+          { success: false, error: "Impossible de générer le QR code" },
+          { status: 500 }
+        )
+      }
     }
 
     // Convertir base64 en Buffer pour ImageKit
@@ -374,7 +380,7 @@ export async function POST(request: NextRequest) {
       code: code,
       type: type as any,
       data: qrCodeData,
-      folderId: folderId || null,
+      folderId: (folderId && folderId.trim() !== "" && folderId !== "none") ? folderId : null,
       userId: userId,
       scanned: false,
     }

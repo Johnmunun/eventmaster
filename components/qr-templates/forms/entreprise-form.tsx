@@ -72,8 +72,8 @@ export function EntrepriseForm() {
               handleChange('bannerImage', null)
             }
           }}
-          onRemove={() => handleChange('bannerImage', null)}
-        />
+            onRemove={() => handleChange('bannerImage', null)}
+          />
       </div>
 
       <div>

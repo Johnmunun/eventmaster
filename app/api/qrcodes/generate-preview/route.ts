@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       // @ts-ignore - QRCode.toDataURL retourne bien une Promise<string>
       const result: string = await QRCode.toDataURL(data, qrCodeOptions)
       qrCodeDataUrl = result
-      console.log("QR code généré avec succès")
+    console.log("QR code généré avec succès")
     } catch (qrError) {
       console.error("Erreur génération QR code:", qrError)
       return NextResponse.json(

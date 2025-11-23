@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { FrameConfig } from "@/lib/qr-frames"
-import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 interface QRWithFrameProps {
@@ -37,7 +36,7 @@ export function QRWithFrame({
       return
     }
 
-    const img = new Image()
+    const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
       setFrameImage(img)
@@ -99,7 +98,7 @@ export function QRWithFrame({
         </svg>`
 
         // Convertir SVG en image
-        const img = new Image()
+        const img = new window.Image()
         img.onload = () => {
           ctx.drawImage(img, 0, 0)
           setQrSvg(canvas.toDataURL("image/png"))
@@ -147,7 +146,7 @@ export function QRWithFrame({
       const x = (size * frame.qrPosition.x) / 100 - qrSize / 2
       const y = (size * frame.qrPosition.y) / 100 - qrSize / 2
 
-      const qrImg = new Image()
+      const qrImg = new window.Image()
       qrImg.onload = () => {
         ctx.drawImage(qrImg, x, y, qrSize, qrSize)
       }
@@ -165,7 +164,7 @@ export function QRWithFrame({
     canvas.width = size
     canvas.height = size
 
-    const qrImg = new Image()
+    const qrImg = new window.Image()
     qrImg.onload = () => {
       ctx.drawImage(qrImg, 0, 0, size, size)
     }
@@ -224,7 +223,7 @@ export function QRWithFrameSimple({
       return
     }
 
-    const img = new Image()
+    const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
       setFrameLoaded(true)
@@ -336,7 +335,7 @@ export function QRWithFrameSimple({
   )
 }
 
-// Helper pour créer un filtre de couleur CSS
+// Helper pour créer un filtre de couleur CSS qui ne cache pas l'image
 function createColorFilter(hex: string): string {
   const rgb = hexToRgb(hex)
   if (!rgb) return ""
@@ -348,7 +347,9 @@ function createColorFilter(hex: string): string {
   const b = rgb.b / 255
   
   // Créer une matrice de couleur pour teinter l'image
-  return `brightness(0) saturate(100%) invert(${1 - r}) sepia(100%) saturate(${g * 100}%) hue-rotate(${b * 360}deg)`
+  // Ne pas utiliser brightness(0) qui rend l'image invisible
+  // Utiliser brightness(0.8) pour garder la visibilité
+  return `brightness(0.8) saturate(100%) invert(${1 - r}) sepia(100%) saturate(${g * 100}%) hue-rotate(${b * 360}deg)`
 }
 
 // Helper pour convertir hex en RGB

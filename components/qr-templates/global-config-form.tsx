@@ -90,7 +90,7 @@ export function GlobalConfigForm() {
           </div>
 
           {/* Couleur primaire */}
-          <div>
+        <div>
             <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
               Couleur primaire
             </Label>
@@ -102,22 +102,22 @@ export function GlobalConfigForm() {
                 >
                   <Pencil className="h-4 w-4 text-white drop-shadow-lg" />
                 </div>
-                <Input
-                  type="color"
-                  value={globalConfig.primaryColor}
-                  onChange={(e) => updateGlobalConfig({ primaryColor: e.target.value })}
+            <Input
+              type="color"
+              value={globalConfig.primaryColor}
+              onChange={(e) => updateGlobalConfig({ primaryColor: e.target.value })}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
+            />
               </div>
-              <Input
-                type="text"
-                value={globalConfig.primaryColor}
-                onChange={(e) => updateGlobalConfig({ primaryColor: e.target.value })}
+            <Input
+              type="text"
+              value={globalConfig.primaryColor}
+              onChange={(e) => updateGlobalConfig({ primaryColor: e.target.value })}
                 className="flex-1 rounded-[2px] border-gray-300 dark:border-gray-600"
                 placeholder="#527AC9"
-              />
-            </div>
+            />
           </div>
+        </div>
 
           {/* Bouton swap */}
           <div className="flex justify-center -my-2">
@@ -133,7 +133,7 @@ export function GlobalConfigForm() {
           </div>
 
           {/* Couleur secondaire */}
-          <div>
+        <div>
             <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
               Couleur secondaire
             </Label>
@@ -145,61 +145,61 @@ export function GlobalConfigForm() {
                 >
                   <Pencil className="h-4 w-4 text-white drop-shadow-lg" />
                 </div>
-                <Input
-                  type="color"
-                  value={globalConfig.secondaryColor}
-                  onChange={(e) => updateGlobalConfig({ secondaryColor: e.target.value })}
+            <Input
+              type="color"
+              value={globalConfig.secondaryColor}
+              onChange={(e) => updateGlobalConfig({ secondaryColor: e.target.value })}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
+            />
               </div>
-              <Input
-                type="text"
-                value={globalConfig.secondaryColor}
-                onChange={(e) => updateGlobalConfig({ secondaryColor: e.target.value })}
+            <Input
+              type="text"
+              value={globalConfig.secondaryColor}
+              onChange={(e) => updateGlobalConfig({ secondaryColor: e.target.value })}
                 className="flex-1 rounded-[2px] border-gray-300 dark:border-gray-600"
                 placeholder="#7EC09F"
-              />
-            </div>
-          </div>
+            />
+        </div>
+      </div>
 
           {/* Autres options (collapsibles) */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div>
+      <div>
               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                 Couleur de fond du template
               </Label>
               <div className="flex items-center gap-3">
-                <Input
-                  type="color"
-                  value={globalConfig.backgroundColor || '#FFFFFF'}
-                  onChange={(e) => updateGlobalConfig({ backgroundColor: e.target.value })}
+          <Input
+            type="color"
+            value={globalConfig.backgroundColor || '#FFFFFF'}
+            onChange={(e) => updateGlobalConfig({ backgroundColor: e.target.value })}
                   className="w-10 h-10 cursor-pointer rounded-md"
-                />
-                <Input
-                  type="text"
-                  value={globalConfig.backgroundColor || ''}
-                  onChange={(e) => updateGlobalConfig({ backgroundColor: e.target.value || null })}
+          />
+          <Input
+            type="text"
+            value={globalConfig.backgroundColor || ''}
+            onChange={(e) => updateGlobalConfig({ backgroundColor: e.target.value || null })}
                   className="flex-1 rounded-[2px] border-gray-300 dark:border-gray-600"
-                  placeholder="#FFFFFF ou vide"
-                />
+            placeholder="#FFFFFF ou vide"
+          />
               </div>
-            </div>
-          </div>
+        </div>
+      </div>
 
           {/* Image de couverture */}
           <FileInput
             label="Image de couverture (optionnel)"
             description="Utilisée comme arrière-plan de la page QR. Remplace le dégradé de couleurs pour un aspect plus personnalisé."
-            accept="image/*"
+          accept="image/*"
             maxSize={5}
             preview={globalConfig.coverImage || null}
             onFileChange={(file) => {
-              if (file) {
-                const reader = new FileReader()
-                reader.onload = (event) => {
-                  updateGlobalConfig({ coverImage: event.target?.result as string })
-                }
-                reader.readAsDataURL(file)
+            if (file) {
+              const reader = new FileReader()
+              reader.onload = (event) => {
+                updateGlobalConfig({ coverImage: event.target?.result as string })
+              }
+              reader.readAsDataURL(file)
               } else {
                 updateGlobalConfig({ coverImage: null })
               }
@@ -211,16 +211,16 @@ export function GlobalConfigForm() {
           <FileInput
             label="Logo (optionnel)"
             description="Affiche votre logo en bas de la page QR pour renforcer votre identité visuelle (visible dans certains templates comme Profil)."
-            accept="image/*"
+          accept="image/*"
             maxSize={5}
             preview={globalConfig.logo || null}
             onFileChange={(file) => {
-              if (file) {
-                const reader = new FileReader()
-                reader.onload = (event) => {
-                  updateGlobalConfig({ logo: event.target?.result as string })
-                }
-                reader.readAsDataURL(file)
+            if (file) {
+              const reader = new FileReader()
+              reader.onload = (event) => {
+                updateGlobalConfig({ logo: event.target?.result as string })
+              }
+              reader.readAsDataURL(file)
               } else {
                 updateGlobalConfig({ logo: null })
               }
@@ -233,157 +233,157 @@ export function GlobalConfigForm() {
             <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               Style des bordures d'images
             </h4>
-
-            <div className="space-y-4">
-              <div>
+        
+        <div className="space-y-4">
+          <div>
                 <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                   Style de bordure
                 </Label>
-                <Select
-                  value={globalConfig.imageBorderStyle}
-                  onValueChange={(value: any) => updateGlobalConfig({ imageBorderStyle: value })}
-                >
+            <Select
+              value={globalConfig.imageBorderStyle}
+              onValueChange={(value: any) => updateGlobalConfig({ imageBorderStyle: value })}
+            >
                   <SelectTrigger className="rounded-[2px] border-gray-300 dark:border-gray-600">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Aucune</SelectItem>
-                    <SelectItem value="solid">Pleine</SelectItem>
-                    <SelectItem value="dashed">Tirets</SelectItem>
-                    <SelectItem value="dotted">Pointillés</SelectItem>
-                    <SelectItem value="double">Double</SelectItem>
-                    <SelectItem value="shadow">Ombre</SelectItem>
-                    <SelectItem value="gradient">Dégradé</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Aucune</SelectItem>
+                <SelectItem value="solid">Pleine</SelectItem>
+                <SelectItem value="dashed">Tirets</SelectItem>
+                <SelectItem value="dotted">Pointillés</SelectItem>
+                <SelectItem value="double">Double</SelectItem>
+                <SelectItem value="shadow">Ombre</SelectItem>
+                <SelectItem value="gradient">Dégradé</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              {globalConfig.imageBorderStyle !== 'none' && globalConfig.imageBorderStyle !== 'shadow' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+          {globalConfig.imageBorderStyle !== 'none' && globalConfig.imageBorderStyle !== 'shadow' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                     <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                       Épaisseur (px)
                     </Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={globalConfig.imageBorderWidth}
-                      onChange={(e) => updateGlobalConfig({ imageBorderWidth: parseInt(e.target.value) || 2 })}
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={globalConfig.imageBorderWidth}
+                  onChange={(e) => updateGlobalConfig({ imageBorderWidth: parseInt(e.target.value) || 2 })}
                       className="rounded-[2px] border-gray-300 dark:border-gray-600"
-                    />
-                  </div>
-                  <div>
+                />
+              </div>
+              <div>
                     <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                       Couleur
                     </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="color"
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
                         className="w-12 h-10 cursor-pointer rounded-md"
-                        value={globalConfig.imageBorderColor}
-                        onChange={(e) => updateGlobalConfig({ imageBorderColor: e.target.value })}
-                      />
-                      <Input
-                        type="text"
-                        value={globalConfig.imageBorderColor}
-                        onChange={(e) => updateGlobalConfig({ imageBorderColor: e.target.value })}
+                    value={globalConfig.imageBorderColor}
+                    onChange={(e) => updateGlobalConfig({ imageBorderColor: e.target.value })}
+                  />
+                  <Input
+                    type="text"
+                    value={globalConfig.imageBorderColor}
+                    onChange={(e) => updateGlobalConfig({ imageBorderColor: e.target.value })}
                         className="flex-1 rounded-[2px] border-gray-300 dark:border-gray-600"
-                      />
-                    </div>
-                  </div>
+                  />
                 </div>
-              )}
+              </div>
+            </div>
+          )}
 
-              <div>
+          <div>
                 <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                   Arrondi des images
                 </Label>
-                <Select
-                  value={globalConfig.imageBorderRadius}
-                  onValueChange={(value: any) => updateGlobalConfig({ imageBorderRadius: value })}
-                >
+            <Select
+              value={globalConfig.imageBorderRadius}
+              onValueChange={(value: any) => updateGlobalConfig({ imageBorderRadius: value })}
+            >
                   <SelectTrigger className="rounded-[2px] border-gray-300 dark:border-gray-600">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Aucun</SelectItem>
-                    <SelectItem value="small">Petit</SelectItem>
-                    <SelectItem value="medium">Moyen</SelectItem>
-                    <SelectItem value="large">Grand</SelectItem>
-                    <SelectItem value="full">Rond</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Aucun</SelectItem>
+                <SelectItem value="small">Petit</SelectItem>
+                <SelectItem value="medium">Moyen</SelectItem>
+                <SelectItem value="large">Grand</SelectItem>
+                <SelectItem value="full">Rond</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        </div>
+      </div>
 
           {/* Typographie et autres */}
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div>
+        <div>
               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                 Typographie
               </Label>
-              <Select
-                value={globalConfig.typography}
-                onValueChange={(value: any) => updateGlobalConfig({ typography: value })}
-              >
+          <Select
+            value={globalConfig.typography}
+            onValueChange={(value: any) => updateGlobalConfig({ typography: value })}
+          >
                 <SelectTrigger className="rounded-md border-gray-300 dark:border-gray-600">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sans">Sans-serif (Poppins)</SelectItem>
-                  <SelectItem value="serif">Serif (Georgia)</SelectItem>
-                  <SelectItem value="mono">Monospace (JetBrains)</SelectItem>
-                  <SelectItem value="times">Times New Roman</SelectItem>
-                  <SelectItem value="playfair">Playfair Display</SelectItem>
-                  <SelectItem value="montserrat">Montserrat</SelectItem>
-                  <SelectItem value="roboto">Roboto</SelectItem>
-                  <SelectItem value="lato">Lato</SelectItem>
-                  <SelectItem value="cursive">Cursive (Dancing Script)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sans">Sans-serif (Poppins)</SelectItem>
+              <SelectItem value="serif">Serif (Georgia)</SelectItem>
+              <SelectItem value="mono">Monospace (JetBrains)</SelectItem>
+              <SelectItem value="times">Times New Roman</SelectItem>
+              <SelectItem value="playfair">Playfair Display</SelectItem>
+              <SelectItem value="montserrat">Montserrat</SelectItem>
+              <SelectItem value="roboto">Roboto</SelectItem>
+              <SelectItem value="lato">Lato</SelectItem>
+              <SelectItem value="cursive">Cursive (Dancing Script)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                 Poids de la police
               </Label>
-              <Select
-                value={globalConfig.fontWeight || 'normal'}
-                onValueChange={(value: any) => updateGlobalConfig({ fontWeight: value })}
-              >
+          <Select
+            value={globalConfig.fontWeight || 'normal'}
+            onValueChange={(value: any) => updateGlobalConfig({ fontWeight: value })}
+          >
                 <SelectTrigger className="rounded-md border-gray-300 dark:border-gray-600">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">Light (300)</SelectItem>
-                  <SelectItem value="normal">Normal (400)</SelectItem>
-                  <SelectItem value="medium">Medium (500)</SelectItem>
-                  <SelectItem value="semibold">Semi-bold (600)</SelectItem>
-                  <SelectItem value="bold">Bold (700)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light (300)</SelectItem>
+              <SelectItem value="normal">Normal (400)</SelectItem>
+              <SelectItem value="medium">Medium (500)</SelectItem>
+              <SelectItem value="semibold">Semi-bold (600)</SelectItem>
+              <SelectItem value="bold">Bold (700)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
               <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 block">
                 Arrondis
               </Label>
-              <Select
-                value={globalConfig.borderRadius}
-                onValueChange={(value: any) => updateGlobalConfig({ borderRadius: value })}
-              >
+          <Select
+            value={globalConfig.borderRadius}
+            onValueChange={(value: any) => updateGlobalConfig({ borderRadius: value })}
+          >
                 <SelectTrigger className="rounded-md border-gray-300 dark:border-gray-600">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="small">Petit</SelectItem>
-                  <SelectItem value="medium">Moyen</SelectItem>
-                  <SelectItem value="large">Grand</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">Petit</SelectItem>
+              <SelectItem value="medium">Moyen</SelectItem>
+              <SelectItem value="large">Grand</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+    </div>
     </FormSection>
   )
 }

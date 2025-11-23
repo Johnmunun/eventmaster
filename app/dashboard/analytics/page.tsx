@@ -26,37 +26,37 @@ export default function AnalyticsPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* En-tête */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Statistiques & Analytics</h1>
-          <p className="text-gray-600 mt-2">Suivez vos performances et insights</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Statistiques & Analytics</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">Suivez vos performances et insights</p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2 w-full sm:w-auto">
           <Download className="h-4 w-4" />
           Exporter le rapport
         </Button>
       </div>
 
       {/* KPIs principaux */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {kpis.map((kpi) => {
           const Icon = kpi.icon
           return (
             <Card key={kpi.label}>
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">{kpi.label}</p>
-                    <p className="text-3xl font-bold mt-2">{kpi.value}</p>
-                    <div className="flex items-center gap-1 mt-2">
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-600 font-medium">{kpi.change}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">{kpi.label}</p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 sm:mt-2">{kpi.value}</p>
+                    <div className="flex items-center gap-1 mt-1 sm:mt-2">
+                      <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs sm:text-sm text-green-600 dark:text-green-400 font-medium">{kpi.change}</span>
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg bg-gray-50 ${kpi.color}`}>
-                    <Icon className="h-6 w-6" />
+                  <div className={`p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800 ${kpi.color} flex-shrink-0 ml-2`}>
+                    <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
                   </div>
                 </div>
               </CardContent>
@@ -66,15 +66,15 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Graphiques */}
-      <Tabs defaultValue="events" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="events">Événements</TabsTrigger>
-          <TabsTrigger value="guests">Invités</TabsTrigger>
-          <TabsTrigger value="qrcodes">QR Codes</TabsTrigger>
+      <Tabs defaultValue="events" className="space-y-4 sm:space-y-6">
+        <TabsList className="w-full sm:w-auto grid grid-cols-3">
+          <TabsTrigger value="events" className="text-xs sm:text-sm">Événements</TabsTrigger>
+          <TabsTrigger value="guests" className="text-xs sm:text-sm">Invités</TabsTrigger>
+          <TabsTrigger value="qrcodes" className="text-xs sm:text-sm">QR Codes</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="events" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
+        <TabsContent value="events" className="space-y-4 sm:space-y-6">
+          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Graphique principal */}
             <Card>
               <CardHeader>

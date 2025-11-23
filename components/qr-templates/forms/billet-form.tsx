@@ -32,8 +32,8 @@ export function BilletForm() {
               handleChange('coverImage', null)
             }
           }}
-          onRemove={() => handleChange('coverImage', null)}
-        />
+            onRemove={() => handleChange('coverImage', null)}
+          />
       </div>
 
       <div>

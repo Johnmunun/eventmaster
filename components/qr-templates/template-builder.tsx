@@ -138,9 +138,9 @@ export function TemplateBuilder({ onNext, onSave, onBack }: TemplateBuilderProps
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 h-full">
+    <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 min-h-full">
       {/* Colonne gauche : Configuration (col-md-7) */}
-      <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col h-full min-h-0">
+      <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col min-h-full w-full">
         {/* Bouton retour - masqué si onBack n'est pas fourni (utilisé dans l'étape 2) */}
         {selectedTemplate && onBack && (
           <div className="mb-4">
@@ -177,36 +177,36 @@ export function TemplateBuilder({ onNext, onSave, onBack }: TemplateBuilderProps
             </>
           )}
         </div>
-      </div>
-
-      {/* Colonne droite : Preview mobile (col-md-3) */}
-      <div className="order-1 lg:order-2 lg:col-span-3 flex flex-col items-center lg:sticky lg:top-0 h-full">
+        </div>
+        
+      {/* Colonne droite : Preview mobile (col-md-3) - Masqué sur mobile */}
+      <div className="hidden lg:flex order-1 lg:order-2 lg:col-span-3 flex-col items-center lg:sticky lg:top-0 h-full">
         {/* Toggle Switch - seulement si un template est sélectionné */}
         {selectedTemplate && (
-          <div className="mb-4 w-full" style={{ maxWidth: selectedTemplate === 'whatsapp' ? '320px' : '280px' }}>
+        <div className="mb-4 w-full" style={{ maxWidth: selectedTemplate === 'whatsapp' ? '320px' : '280px' }}>
             <div className="relative inline-flex rounded-lg border-2 border-primary overflow-hidden bg-white">
-              <button
-                onClick={() => setViewMode('preview')}
-                className={`px-6 py-2 text-sm font-bold transition-all ${
-                  viewMode === 'preview'
+            <button
+              onClick={() => setViewMode('preview')}
+              className={`px-6 py-2 text-sm font-bold transition-all ${
+                viewMode === 'preview'
                     ? 'bg-primary text-white'
                     : 'bg-white text-primary'
-                }`}
-              >
-                Aperçu
-              </button>
-              <button
-                onClick={() => setViewMode('qrcode')}
-                className={`px-6 py-2 text-sm font-bold transition-all ${
-                  viewMode === 'qrcode'
+              }`}
+            >
+              Aperçu
+            </button>
+            <button
+              onClick={() => setViewMode('qrcode')}
+              className={`px-6 py-2 text-sm font-bold transition-all ${
+                viewMode === 'qrcode'
                     ? 'bg-primary text-white'
                     : 'bg-white text-primary'
-                }`}
-              >
-                Code QR
-              </button>
-            </div>
+              }`}
+            >
+              Code QR
+            </button>
           </div>
+        </div>
         )}
         
         <div className="relative">

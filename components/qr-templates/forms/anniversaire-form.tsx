@@ -40,8 +40,8 @@ export function AnniversaireForm() {
               handleChange('personImage', null)
             }
           }}
-          onRemove={() => handleChange('personImage', null)}
-        />
+            onRemove={() => handleChange('personImage', null)}
+          />
       </div>
 
       <div>

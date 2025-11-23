@@ -33,8 +33,8 @@ export function VCardForm() {
               handleChange('profileImage', null)
             }
           }}
-          onRemove={() => handleChange('profileImage', null)}
-        />
+            onRemove={() => handleChange('profileImage', null)}
+          />
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -1,29 +1,23 @@
-import { Header } from '@/components/header'
-import { HeroSection } from '@/components/hero-section'
-import { FeaturesSection } from '@/components/features-section'
-import { DemoSection } from '@/components/demo-section'
-import { EventTypesSection } from '@/components/event-types-section'
-import { StatsSection } from '@/components/stats-section'
-import { TestimonialsSection } from '@/components/testimonials-section'
-import { CtaSection } from '@/components/cta-section'
-import { Footer } from '@/components/footer'
-import { PricingSection } from '@/components/pricing-section'
+import { LandingHeader } from '@/components/landing/header'
+import { LandingHeroSection } from '@/components/landing/hero-section'
+import { BenefitsSection } from '@/components/landing/benefits-section'
+import { LandingFeaturesSection } from '@/components/landing/features-section'
+import { LandingPricingSection } from '@/components/landing/pricing-section'
+import { LandingCtaSection } from '@/components/landing/cta-section'
+import { LandingFooter } from '@/components/landing/footer'
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen">
-      <Header />
+    <div className="min-h-screen bg-white dark:bg-gray-950">
+      <LandingHeader />
       <main>
-        <HeroSection />
-        <StatsSection />
-        <FeaturesSection />
-        <DemoSection />
-        <EventTypesSection />
-        <TestimonialsSection />
-        <PricingSection />
-        <CtaSection />
+        <LandingHeroSection />
+        <BenefitsSection />
+        <LandingFeaturesSection />
+        <LandingPricingSection />
+        <LandingCtaSection />
       </main>
-      <Footer />
+      <LandingFooter />
     </div>
   )
 }

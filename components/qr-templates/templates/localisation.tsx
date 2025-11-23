@@ -59,11 +59,11 @@ export function LocalisationTemplate() {
         }}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
           <div className="relative z-10">
-            <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4">
               <div className={`${borderRadiusClass} bg-white/20 backdrop-blur-sm p-4 shadow-lg`}>
                 <MapPin className="w-7 h-7 text-white" />
-              </div>
-              <div className="flex-1">
+            </div>
+            <div className="flex-1">
                 <h1 className="text-2xl font-bold mb-3 drop-shadow-lg">Localisation</h1>
                 <p className="text-base opacity-95 leading-relaxed">{data.address || "Adresse"}</p>
               </div>

@@ -16,7 +16,7 @@ import { CreateQRCodeDrawer } from "@/components/dashboard/qrcodes/create-qrcode
 import { CreateFolderDrawer } from "@/components/dashboard/qrcodes/create-folder-drawer"
 import { QRPreviewDrawer } from "@/components/dashboard/qrcodes/qr-preview-drawer"
 import { QRGeneratorDrawer } from "@/components/dashboard/qrcodes/qr-generator-drawer"
-import { SkeletonCard, SkeletonTable } from "@/components/skeletons"
+import { SkeletonCard, SkeletonTable, SkeletonFolderCard } from "@/components/skeletons"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -512,64 +512,66 @@ export default function QRCodesPage() {
   const totalQRCodes = qrcodes.length
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* En-tête */}
-      <div className="flex items-center justify-between">
+      <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">QR Codes & Badges</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {totalQRCodes > 0 ? `${totalQRCodes} QR code${totalQRCodes > 1 ? 's' : ''}` : "Créez et gérez vos QR codes personnalisés"}
-          </p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Mes codes QR</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Button 
             variant="outline" 
             onClick={() => setIsCreateFolderOpen(true)} 
-            className="gap-2 border-2 hover:border-primary/40"
+            className="gap-2 border-2 border-gray-300 dark:border-gray-600 hover:border-primary/50 rounded-xl h-11 w-full sm:w-auto bg-white dark:bg-gray-900"
           >
             <FolderPlus className="h-4 w-4" />
-            Nouveau dossier
+            <span className="hidden sm:inline">Nouveau dossier</span>
+            <span className="sm:hidden">Dossier</span>
           </Button>
-          <Button onClick={() => setIsGeneratorOpen(true)} className="gap-2 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg">
-            <Sparkles className="h-4 w-4" />
-            Générer un QR Code
+          <Button 
+            onClick={() => setIsGeneratorOpen(true)} 
+            className="gap-2 bg-primary hover:bg-primary/90 text-white shadow-lg rounded-xl h-11 w-full sm:w-auto"
+          >
+            <QrCode className="h-4 w-4" />
+            <span className="hidden sm:inline">Générer un QR Code</span>
+            <span className="sm:hidden">Nouveau QR</span>
           </Button>
         </div>
       </div>
 
       {/* Section Dossiers */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-          <Folder className="h-4 w-4 text-primary" />
+        <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <Folder className="h-5 w-5 text-primary" />
           Mes dossiers
         </h2>
         {isLoadingFolders ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonCard key={i} />
+              <SkeletonFolderCard key={i} />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
             {/* Tous les QR codes */}
             <Card
-              className={`cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 hover:-translate-y-1 border-2 ${
+              className={`cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-2 rounded-2xl ${
                 !selectedFolder 
-                  ? 'ring-2 ring-primary shadow-xl shadow-primary/20 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5' 
+                  ? 'ring-2 ring-primary shadow-lg shadow-primary/20 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5' 
                   : 'border-gray-200 dark:border-gray-700 hover:border-primary/30 bg-white dark:bg-gray-900'
               }`}
               onClick={() => setSelectedFolder(null)}
             >
-              <CardContent className="p-5">
-                <div className="flex flex-col items-center text-center gap-3">
-                  <div className={`p-4 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 shadow-lg ${
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                  <div className={`p-3 sm:p-4 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 shadow-md ${
                     !selectedFolder ? 'ring-2 ring-primary/30' : ''
                   }`}>
-                    <QrCode className={`h-7 w-7 ${!selectedFolder ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`} />
+                    <QrCode className={`h-6 w-6 sm:h-7 sm:w-7 ${!selectedFolder ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`} />
                   </div>
-                  <div className="w-full px-2">
-                    <p className="font-semibold text-sm text-gray-900 dark:text-white break-words">Tous</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{totalQRCodes} QR code{totalQRCodes > 1 ? 's' : ''}</p>
+                  <div className="w-full px-1">
+                    <p className="font-semibold text-xs sm:text-sm text-gray-900 dark:text-white break-words">Tous</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{totalQRCodes} QR code{totalQRCodes > 1 ? 's' : ''}</p>
                   </div>
                 </div>
               </CardContent>
@@ -583,9 +585,9 @@ export default function QRCodesPage() {
               return (
                 <Card
                   key={folder.id}
-                  className={`group cursor-pointer transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 border-2 relative overflow-hidden ${
+                  className={`group cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-2 relative overflow-hidden rounded-2xl ${
                     isSelected
-                      ? `ring-2 ring-primary shadow-xl shadow-primary/20 border-primary/30 ${colors.bg}`
+                      ? `ring-2 ring-primary shadow-lg shadow-primary/20 border-primary/30 ${colors.bg}`
                       : `border-gray-200 dark:border-gray-700 hover:border-primary/30 bg-white dark:bg-gray-900`
                   }`}
                   onClick={() => setSelectedFolder(folder.id)}
@@ -593,17 +595,17 @@ export default function QRCodesPage() {
                   {/* Effet de brillance au survol */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-x-full group-hover:translate-x-full" />
                   
-                  <CardContent className="p-5 relative z-10">
-                    <div className="flex flex-col items-center text-center gap-3">
-                      <div className={`p-4 rounded-xl ${colors.bg} border-2 ${colors.border} shadow-lg group-hover:scale-110 transition-transform duration-300 relative`}>
+                  <CardContent className="p-4 sm:p-5 relative z-10">
+                    <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
+                      <div className={`p-3 sm:p-4 rounded-xl ${colors.bg} border-2 ${colors.border} shadow-md group-hover:scale-110 transition-transform duration-300 relative`}>
                         <div className={`absolute inset-0 ${colors.bg} rounded-xl blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300`} />
-                        <Folder className={`h-7 w-7 ${colors.icon} relative z-10 drop-shadow-sm`} />
+                        <Folder className={`h-6 w-6 sm:h-7 sm:w-7 ${colors.icon} relative z-10 drop-shadow-sm`} />
                       </div>
-                      <div className="w-full px-2 min-w-0">
-                        <p className="font-semibold text-sm text-gray-900 dark:text-white break-words line-clamp-2">
+                      <div className="w-full px-1 min-w-0">
+                        <p className="font-semibold text-xs sm:text-sm text-gray-900 dark:text-white break-words line-clamp-2">
                           {folder.name}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                           {folder.count} QR code{folder.count > 1 ? 's' : ''}
                         </p>
                       </div>
@@ -645,106 +647,151 @@ export default function QRCodesPage() {
 
       {/* Fil d'Ariane */}
       {selectedFolder && (
-        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 px-1">
           <button 
             onClick={() => setSelectedFolder(null)} 
             className="hover:text-primary transition-colors font-medium"
           >
             Tous les QR codes
           </button>
-          <ChevronRight className="h-4 w-4" />
-          <span className="font-semibold text-gray-900 dark:text-white">
+          <ChevronRight className="h-4 w-4 flex-shrink-0" />
+          <span className="font-semibold text-gray-900 dark:text-white truncate">
             {folders.find(f => f.id === selectedFolder)?.name}
           </span>
         </div>
       )}
 
-      {/* Barre de filtres améliorée */}
-      <Card className="border-2 border-primary/10 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 shadow-lg">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3 items-center">
-            {/* Recherche */}
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Rechercher..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-10 border-2"
-              />
+      {/* Barre de recherche et filtres - Style inspiré de QRgenerator.ai */}
+      <div className="space-y-3">
+        {/* Barre de recherche principale - Style mobile uniquement */}
+        <div className="relative md:hidden">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 z-10" />
+          <Input
+            placeholder="Rechercher..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-12 pr-16 h-12 border border-gray-200 dark:border-gray-700 rounded-2xl text-base bg-gray-50 dark:bg-gray-800 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:bg-white dark:focus:bg-gray-900 transition-all"
+          />
+          {/* Bouton filtre circulaire violet à droite - Mobile uniquement */}
+          <Button
+            variant="default"
+            size="icon"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-primary hover:bg-primary/90 text-white shadow-md"
+            onClick={() => {
+              // Toggle pour afficher/masquer les filtres avancés
+              const filtersCard = document.getElementById('advanced-filters')
+              if (filtersCard) {
+                filtersCard.classList.toggle('hidden')
+              }
+            }}
+          >
+            <Filter className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Barre de recherche desktop - Style original */}
+        <div className="relative hidden md:block">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Input
+            placeholder="Rechercher..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-12 pr-14 h-12 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-base bg-white dark:bg-gray-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+          />
+          {/* Bouton filtre circulaire à droite - Desktop */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-primary/50 bg-white dark:bg-gray-900"
+            onClick={() => {
+              // Toggle pour afficher/masquer les filtres avancés
+              const filtersCard = document.getElementById('advanced-filters')
+              if (filtersCard) {
+                filtersCard.classList.toggle('hidden')
+              }
+            }}
+          >
+            <Filter className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Filtres avancés (masqués par défaut sur mobile, affichables via le bouton filtre) */}
+        <Card 
+          id="advanced-filters"
+          className="hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl shadow-sm md:block"
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-3 items-center">
+              {/* Statut du code QR */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[160px] border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="active">Actif</SelectItem>
+                  <SelectItem value="scanned">Scanné</SelectItem>
+                  <SelectItem value="unscanned">Non scanné</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Types de codes QR */}
+              <Select value={typeFilter || "all"} onValueChange={(value) => setTypeFilter(value === "all" ? "" : value)}>
+                <SelectTrigger className="w-full sm:w-[180px] border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <SelectValue placeholder="Types de codes QR" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  <SelectItem value="EVENT">Événement</SelectItem>
+                  <SelectItem value="GUEST">Invité</SelectItem>
+                  <SelectItem value="CUSTOM">Personnalisé</SelectItem>
+                  <SelectItem value="URL">URL</SelectItem>
+                  <SelectItem value="MENU">Menu</SelectItem>
+                  <SelectItem value="WIFI">Wi-Fi</SelectItem>
+                  <SelectItem value="PROGRAM">Programme</SelectItem>
+                  <SelectItem value="VCARD">vCard</SelectItem>
+                  <SelectItem value="COUPON">Coupon</SelectItem>
+                  <SelectItem value="PLAYLIST">Playlist</SelectItem>
+                  <SelectItem value="GALLERY">Galerie</SelectItem>
+                  <SelectItem value="FEEDBACK">Feedback</SelectItem>
+                  <SelectItem value="LIVE_STREAM">Live Stream</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Trier par */}
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-full sm:w-[160px] border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Le plus récent</SelectItem>
+                  <SelectItem value="oldest">Le plus ancien</SelectItem>
+                  <SelectItem value="name">Nom (A-Z)</SelectItem>
+                  <SelectItem value="scans">Plus de scans</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Quantité */}
+              <Select value={quantity} onValueChange={setQuantity}>
+                <SelectTrigger className="w-full sm:w-[100px] border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            {/* Statut du code QR */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px] border-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="active">Actif</SelectItem>
-                <SelectItem value="scanned">Scanné</SelectItem>
-                <SelectItem value="unscanned">Non scanné</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Types de codes QR */}
-            <Select value={typeFilter || "all"} onValueChange={(value) => setTypeFilter(value === "all" ? "" : value)}>
-              <SelectTrigger className="w-[180px] border-2">
-                <SelectValue placeholder="Types de codes QR" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                <SelectItem value="EVENT">Événement</SelectItem>
-                <SelectItem value="GUEST">Invité</SelectItem>
-                <SelectItem value="CUSTOM">Personnalisé</SelectItem>
-                <SelectItem value="URL">URL</SelectItem>
-                <SelectItem value="MENU">Menu</SelectItem>
-                <SelectItem value="WIFI">Wi-Fi</SelectItem>
-                <SelectItem value="PROGRAM">Programme</SelectItem>
-                <SelectItem value="VCARD">vCard</SelectItem>
-                <SelectItem value="COUPON">Coupon</SelectItem>
-                <SelectItem value="PLAYLIST">Playlist</SelectItem>
-                <SelectItem value="GALLERY">Galerie</SelectItem>
-                <SelectItem value="FEEDBACK">Feedback</SelectItem>
-                <SelectItem value="LIVE_STREAM">Live Stream</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Trier par */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[160px] border-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Le plus récent</SelectItem>
-                <SelectItem value="oldest">Le plus ancien</SelectItem>
-                <SelectItem value="name">Nom (A-Z)</SelectItem>
-                <SelectItem value="scans">Plus de scans</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Quantité */}
-            <Select value={quantity} onValueChange={setQuantity}>
-              <SelectTrigger className="w-[100px] border-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Checkbox Tout sélectionner et Suppression multiple */}
       {qrcodes.length > 0 && (
-        <div className="flex items-center justify-between gap-2 py-2">
-          <Button
-            variant="ghost"
-            size="sm"
+        <div className="flex items-center justify-between gap-3 py-3 px-1">
+          <button
             onClick={() => {
               if (selectedQRCodes.size === qrcodes.length) {
                 setSelectedQRCodes(new Set())
@@ -752,22 +799,22 @@ export default function QRCodesPage() {
                 setSelectedQRCodes(new Set(qrcodes.map(qr => qr.id)))
               }
             }}
-            className="h-8 px-2"
+            className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-primary transition-colors"
           >
             {selectedQRCodes.size === qrcodes.length ? (
-              <CheckSquare className="h-4 w-4 mr-2" />
+              <CheckSquare className="h-5 w-5 text-primary" />
             ) : (
-              <Square className="h-4 w-4 mr-2" />
+              <Square className="h-5 w-5 text-gray-400" />
             )}
-            Tout sélectionner
-          </Button>
+            <span className="font-medium">Tout sélectionner</span>
+          </button>
           
           {selectedQRCodes.size > 0 && (
             <Button
               variant="destructive"
               size="sm"
               onClick={handleDeleteMultipleQRCodes}
-              className="h-8 px-3"
+              className="h-9 px-4 rounded-lg"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Supprimer ({selectedQRCodes.size})
@@ -778,14 +825,14 @@ export default function QRCodesPage() {
 
       {/* Grille des QR codes */}
       {isLoadingQrcodes ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-3 md:space-y-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
       ) : qrcodes.length === 0 ? (
-        <Card className="border-2 border-dashed">
-          <CardContent className="p-12 text-center">
+        <Card className="border-2 border-dashed rounded-2xl">
+          <CardContent className="p-8 md:p-12 text-center">
             <QrCode className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Aucun QR code trouvé
@@ -804,7 +851,7 @@ export default function QRCodesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 md:space-y-4">
           {qrcodes.map((qr) => {
             const qrData = qr as any
             // Utiliser scanCount si disponible, sinon utiliser scanned (1 ou 0)
@@ -815,100 +862,93 @@ export default function QRCodesPage() {
             return (
               <Card 
                 key={qr.id} 
-                className="group hover:shadow-lg transition-all duration-200 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
+                className="group hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-sm"
               >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    {/* Checkbox */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={() => {
-                        const newSelected = new Set(selectedQRCodes)
-                        if (newSelected.has(qr.id)) {
-                          newSelected.delete(qr.id)
-                        } else {
-                          newSelected.add(qr.id)
-                        }
-                        setSelectedQRCodes(newSelected)
-                      }}
-                    >
-                      {selectedQRCodes.has(qr.id) ? (
-                        <CheckSquare className="h-5 w-5 text-primary" />
-                      ) : (
-                        <Square className="h-5 w-5 text-gray-400" />
-                      )}
-                    </Button>
-
-                    {/* Miniature QR Code */}
-                    <div className="w-16 h-16 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0">
-                      {qr.imageUrl ? (
-                        <img
-                          src={qr.imageUrl}
-                          alt={qr.name}
-                          className="w-full h-full object-contain p-1"
-                        />
-                      ) : (
-                        <QrCode className="h-8 w-8 text-gray-400" />
-                      )}
-                    </div>
-
-                    {/* Informations principales */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge className={`${getTypeColor(qr.type)} text-xs px-2 py-0.5`}>
-                          {getTypeLabel(qr.type)}
-                        </Badge>
-                        <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">
-                          {qr.name}
-                        </h3>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{new Date(qr.createdAt).toLocaleDateString("fr-FR", { month: "long", day: "numeric", year: "numeric" })}</span>
-                        </div>
-                        {qr.folder ? (
-                          <div className="flex items-center gap-1">
-                            <Folder className="h-3 w-3" />
-                            <span>{qr.folder.name}</span>
-                          </div>
+                <CardContent className="p-4 md:p-5">
+                  {/* Layout mobile-first : vertical sur mobile, horizontal sur desktop */}
+                  <div className="flex flex-col md:flex-row md:items-center gap-4">
+                    {/* Section gauche : Checkbox + Miniature */}
+                    <div className="flex items-start gap-3 md:gap-4">
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => {
+                          const newSelected = new Set(selectedQRCodes)
+                          if (newSelected.has(qr.id)) {
+                            newSelected.delete(qr.id)
+                          } else {
+                            newSelected.add(qr.id)
+                          }
+                          setSelectedQRCodes(newSelected)
+                        }}
+                        className="mt-1 flex-shrink-0"
+                      >
+                        {selectedQRCodes.has(qr.id) ? (
+                          <CheckSquare className="h-5 w-5 text-primary" />
                         ) : (
-                          <div className="flex items-center gap-1 text-gray-400">
-                            <Folder className="h-3 w-3" />
-                            <span>Aucun dossier</span>
-                          </div>
+                          <Square className="h-5 w-5 text-gray-400" />
+                        )}
+                      </button>
+
+                      {/* Miniature QR Code */}
+                      <div className="w-20 h-20 md:w-24 md:h-24 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        {qr.imageUrl ? (
+                          <img
+                            src={qr.imageUrl}
+                            alt={qr.name}
+                            className="w-full h-full object-contain p-1.5 rounded-lg"
+                          />
+                        ) : (
+                          <QrCode className="h-10 w-10 md:h-12 md:w-12 text-gray-400" />
                         )}
                       </div>
                     </div>
 
-                    {/* URL et Date de modification */}
-                    <div className="flex flex-col items-end gap-1 text-xs text-gray-500 dark:text-gray-400 min-w-0">
-                      {url && (
-                        <div className="flex items-center gap-1 max-w-[200px]">
-                          <Globe className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{url}</span>
+                    {/* Section centrale : Informations principales */}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {/* Titre et Type + Dossier sur la même ligne */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-base md:text-lg text-gray-900 dark:text-white">
+                          {qr.name}
+                        </h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={`${getTypeColor(qr.type)} text-xs px-2.5 py-0.5 rounded-full`}>
+                            {getTypeLabel(qr.type)}
+                          </Badge>
+                          {qr.type === "URL" && (
+                            <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full border-blue-300 text-blue-700 dark:text-blue-400">
+                              QR statique
+                            </Badge>
+                          )}
+                          {qr.folder && qr.folder.id && qr.folder.name ? (
+                            <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                              <Folder className="h-3.5 w-3.5" />
+                              <span className="truncate">{qr.folder.name}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                              <Folder className="h-3.5 w-3.5" />
+                              <span>Aucun dossier</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Edit2 className="h-3 w-3" />
-                        <span>Modifié : {new Date(updatedAt).toLocaleDateString("fr-FR", { month: "long", day: "numeric", year: "numeric" })}</span>
+                      </div>
+
+                      {/* Métadonnées */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center gap-1.5">
+                          <Edit2 className="h-3.5 w-3.5" />
+                          <span>Modifié : {new Date(updatedAt).toLocaleDateString("fr-FR", { month: "long", day: "numeric", year: "numeric" })}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Nombre de scans */}
-                    <div className="flex flex-col items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 flex-shrink-0">
-                      <span className="text-xl font-bold">{scanCount}</span>
-                      <span className="text-xs">Scans</span>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-2 flex-shrink-0">
+                    {/* Section droite : Actions en haut à droite */}
+                    <div className="flex items-start justify-end gap-2 md:gap-3 flex-shrink-0 md:items-center">
+                      {/* Bouton Télécharger */}
                       <Button
-                        variant="default"
+                        variant="outline"
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
+                        className="border-2 border-primary/30 text-primary hover:bg-primary hover:text-white h-9 px-3 md:px-4 rounded-lg transition-all"
                         onClick={async () => {
                           try {
                             const response = await fetch(`/api/qrcodes/${qr.id}/download`)
@@ -935,27 +975,31 @@ export default function QRCodesPage() {
                           }
                         }}
                       >
-                        <Download className="h-3 w-3 mr-1" />
-                        Télécharger
+                        <Download className="h-4 w-4 mr-1.5" />
+                        <span className="hidden sm:inline">Télécharger</span>
                       </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
-                        onClick={() => {
-                          setPreviewQRCodeId(qr.id)
-                          setIsPreviewOpen(true)
-                        }}
-                      >
-                        Détail
-                      </Button>
+                      
+                      {/* Menu Plus d'options */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="default" size="icon" className="bg-green-600 hover:bg-green-700 text-white h-8 w-8 rounded-full">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-9 w-9 rounded-lg border-2 border-gray-300 dark:border-gray-600 hover:border-primary/50"
+                          >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setPreviewQRCodeId(qr.id)
+                              setIsPreviewOpen(true)
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Voir les détails
+                          </DropdownMenuItem>
                           <DropdownMenuItem>
                             <Edit2 className="h-4 w-4 mr-2" />
                             Modifier
@@ -965,7 +1009,7 @@ export default function QRCodesPage() {
                             Personnaliser
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            className="text-red-600"
+                            className="text-red-600 focus:text-red-600"
                             onClick={() => handleDeleteQRCode(qr.id)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />

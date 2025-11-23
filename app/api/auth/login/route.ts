@@ -28,10 +28,10 @@ export async function POST(request: NextRequest) {
     let result
     try {
       result = await signIn("credentials", {
-        email: validatedData.email,
-        password: validatedData.password,
-        redirect: false,
-      })
+      email: validatedData.email,
+      password: validatedData.password,
+      redirect: false,
+    })
     } catch (authError: any) {
       // Gérer les erreurs de connexion à la base de données
       if (isDatabaseConnectionError(authError)) {

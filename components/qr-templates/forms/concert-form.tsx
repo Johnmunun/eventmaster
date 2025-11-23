@@ -40,8 +40,8 @@ export function ConcertForm() {
               handleChange('artistImage', null)
             }
           }}
-          onRemove={() => handleChange('artistImage', null)}
-        />
+            onRemove={() => handleChange('artistImage', null)}
+          />
       </div>
 
       <div>

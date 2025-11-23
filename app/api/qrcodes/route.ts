@@ -353,7 +353,7 @@ export async function GET(request: NextRequest) {
         imageKitFileId: qrData?.imageKitFileId || null,
         url: qrData?.url || "",
         event: qr.event,
-        folder: qr.folder,
+        folder: qr.folder, // Inclure le folder même s'il est null
         guest: qr.guest,
       }
     })

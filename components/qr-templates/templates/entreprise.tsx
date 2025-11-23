@@ -44,8 +44,8 @@ export function EntrepriseTemplate() {
         <div className="relative z-10 flex items-center gap-3">
           <Building2 className="w-6 h-6 text-white" />
           <h1 className="text-xl font-bold text-white text-center drop-shadow-lg" style={typographyStyle}>
-            {data.companyName || "Nom de l'entreprise"}
-          </h1>
+          {data.companyName || "Nom de l'entreprise"}
+        </h1>
         </div>
       </div>
 

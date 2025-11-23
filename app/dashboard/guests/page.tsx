@@ -329,25 +329,25 @@ export default function GuestsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* En-tête */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Invités</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Invités</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
             {stats ? `${stats.total} invité${stats.total > 1 ? 's' : ''}` : "Gérez votre liste d'invités"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button 
             variant="outline" 
             onClick={() => setIsPublicFormOpen(true)} 
-            className="gap-2 border-2 hover:border-primary/40"
+            className="gap-2 border-2 hover:border-primary/40 w-full sm:w-auto"
           >
             <Share2 className="h-4 w-4" />
             Formulaire public
           </Button>
-          <Button onClick={() => setIsAddOpen(true)} className="gap-2">
+          <Button onClick={() => setIsAddOpen(true)} className="gap-2 w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Ajouter un invité
           </Button>
@@ -356,13 +356,13 @@ export default function GuestsPage() {
 
       {/* Statistiques */}
       {isLoadingStats ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
       ) : stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card className="border-2 border-primary/10 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 hover:shadow-lg transition-all">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
@@ -438,10 +438,10 @@ export default function GuestsPage() {
             </div>
 
             {/* Ligne 2: Filtres */}
-            <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
               {/* Filtre par statut */}
               <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[180px] border-2">
+                <SelectTrigger className="w-full sm:w-[180px] border-2">
                   <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
                 <SelectContent>
@@ -455,7 +455,7 @@ export default function GuestsPage() {
 
               {/* Filtre par événement */}
               <Select value={eventFilter || "all"} onValueChange={(value) => setEventFilter(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[200px] border-2">
+                <SelectTrigger className="w-full sm:w-[200px] border-2">
                   <SelectValue placeholder="Tous les événements" />
                 </SelectTrigger>
                 <SelectContent>
@@ -470,7 +470,7 @@ export default function GuestsPage() {
 
               {/* Tri */}
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[150px] border-2">
+                <SelectTrigger className="w-full sm:w-[150px] border-2">
                   <SelectValue placeholder="Trier par" />
                 </SelectTrigger>
                 <SelectContent>
@@ -659,11 +659,11 @@ export default function GuestsPage() {
           {pagination && pagination.totalPages > 1 && (
             <Card className="border-2 border-primary/10">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
                     Page {pagination.page} sur {pagination.totalPages} • {pagination.total} invité{pagination.total > 1 ? 's' : ''}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"

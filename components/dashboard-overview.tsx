@@ -285,23 +285,23 @@ export function DashboardOverview() {
   ]
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Tableau de bord</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Tableau de bord</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
             Bienvenue {userName || "..."} ! Voici un aperçu complet de vos événements.
           </p>
         </div>
-        <Button size="lg" className="gap-2">
+        <Button size="lg" className="gap-2 w-full sm:w-auto">
           <Plus className="h-5 w-5" />
           Créer un événement
         </Button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {isLoadingStats ? (
           // Skeleton de chargement
           Array.from({ length: 8 }).map((_, index) => (
@@ -363,7 +363,7 @@ export function DashboardOverview() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {quickActions.map((action, index) => {
               const Icon = action.icon
               return (

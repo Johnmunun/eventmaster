@@ -68,9 +68,9 @@ export function LoginForm() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div className="space-y-2 text-center md:text-left">
-        <h2 className="text-3xl font-bold text-foreground">Bon retour !</h2>
-        <p className="text-muted-foreground">
+      <div className="space-y-3 text-center md:text-left">
+        <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">Bon retour !</h2>
+        <p className="text-base md:text-lg text-gray-600 dark:text-gray-300">
           Connectez-vous pour accéder à votre tableau de bord
         </p>
       </div>
@@ -78,7 +78,7 @@ export function LoginForm() {
       <Button
         type="button"
         variant="outline"
-        className="w-full h-12 text-base border-2 hover:border-primary/50 hover:bg-primary/5 transition-all"
+        className="w-full h-12 text-base border-2 border-gray-200 dark:border-gray-700 hover:border-[#FF6A33]/50 hover:bg-[#FF6A33]/5 transition-all"
         onClick={handleGoogleLogin}
         disabled={isLoading}
       >
@@ -106,7 +106,7 @@ export function LoginForm() {
               placeholder="exemple@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12 border-2 focus:border-primary"
+              className="pl-10 h-12 border-2 focus:border-[#FF6A33]"
               required
             />
           </div>
@@ -117,7 +117,7 @@ export function LoginForm() {
             <Label htmlFor="password" className="text-sm font-medium">Mot de passe</Label>
             <Link
               href="/mot-de-passe-oublie"
-              className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+              className="text-sm text-[#FF6A33] hover:text-[#FF5A23] font-medium transition-colors"
             >
               Mot de passe oublié ?
             </Link>
@@ -130,7 +130,7 @@ export function LoginForm() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 pr-10 h-12 border-2 focus:border-primary"
+              className="pl-10 pr-10 h-12 border-2 focus:border-[#FF6A33]"
               required
             />
             <button
@@ -149,18 +149,20 @@ export function LoginForm() {
           </div>
         )}
 
-        <Button 
-          type="submit" 
-          className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all" 
-          disabled={isLoading}
-        >
-          {isLoading ? "Connexion en cours..." : "Se connecter"}
-        </Button>
+        <div className="pt-4">
+          <Button 
+            type="submit" 
+            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-[#FF6A33] via-[#FF7033] to-[#FF8A3D] hover:from-[#FF5A23] hover:via-[#FF6023] hover:to-[#FF7A2D] text-white shadow-lg hover:shadow-xl hover:shadow-[#FF6A33]/30 transition-all duration-300 hover:scale-[1.02]" 
+            disabled={isLoading}
+          >
+            {isLoading ? "Connexion en cours..." : "Se connecter"}
+          </Button>
+        </div>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
         Pas encore de compte ?{" "}
-        <Link href="/signup" className="text-primary hover:text-primary/80 font-semibold transition-colors">
+        <Link href="/signup" className="text-[#FF6A33] hover:text-[#FF5A23] font-semibold transition-colors">
           Créer un compte
         </Link>
       </p>

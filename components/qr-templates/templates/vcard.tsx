@@ -69,8 +69,8 @@ export function VCardTemplate() {
           <div className="flex items-center justify-center gap-2 mb-8">
             <Briefcase className="w-4 h-4 text-white/80" />
             <p className="text-base text-center text-white/95 font-medium" style={typographyStyle}>
-              {data.jobTitle}
-            </p>
+            {data.jobTitle}
+          </p>
           </div>
         )}
 
@@ -111,8 +111,8 @@ export function VCardTemplate() {
         {data.description && (
           <div className="w-full max-w-sm mb-8 bg-white/15 backdrop-blur-md rounded-2xl p-5 border border-white/20 shadow-lg">
             <p className="text-sm text-center text-white/95 leading-relaxed" style={typographyStyle}>
-              {data.description}
-            </p>
+            {data.description}
+          </p>
           </div>
         )}
 

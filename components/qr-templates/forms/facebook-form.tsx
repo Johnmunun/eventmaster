@@ -51,8 +51,8 @@ export function FacebookForm() {
               handleChange('pageImage', null)
             }
           }}
-          onRemove={() => handleChange('pageImage', null)}
-        />
+            onRemove={() => handleChange('pageImage', null)}
+          />
       </div>
     </div>
   )

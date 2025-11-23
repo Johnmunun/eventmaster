@@ -66,8 +66,8 @@ export function LocalisationForm() {
               handleChange('placeImage', null)
             }
           }}
-          onRemove={() => handleChange('placeImage', null)}
-        />
+            onRemove={() => handleChange('placeImage', null)}
+          />
       </div>
 
       <div>

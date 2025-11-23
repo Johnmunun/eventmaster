@@ -62,8 +62,8 @@ export function InstagramForm() {
               handleChange('profileImage', null)
             }
           }}
-          onRemove={() => handleChange('profileImage', null)}
-        />
+            onRemove={() => handleChange('profileImage', null)}
+          />
       </div>
     </div>
   )
