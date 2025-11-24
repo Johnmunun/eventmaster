@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import { Chrome, Mail, Lock, Eye, EyeOff, User } from 'lucide-react'
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
@@ -194,12 +195,15 @@ export function SignupForm() {
       <Button
         type="button"
         variant="outline"
-        className="w-full h-12 text-base border-2 border-gray-200 dark:border-gray-700 hover:border-[#FF6A33]/50 hover:bg-[#FF6A33]/5 transition-all"
+        className="w-full h-12 text-base border-2 border-gray-200 dark:border-gray-700 hover:border-[#FF6A33]/50 hover:bg-[#FF6A33]/5 transition-all relative"
         onClick={handleGoogleSignup}
         disabled={isLoading}
       >
         <Chrome className="mr-2 h-5 w-5" />
         S'inscrire avec Google
+        <Badge className="absolute -top-2 -right-2 bg-green-500 hover:bg-green-600 text-white text-[10px] px-1.5 py-0.5 font-semibold">
+          Soon
+        </Badge>
       </Button>
 
       <div className="relative">

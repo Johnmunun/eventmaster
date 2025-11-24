@@ -1,11 +1,22 @@
 import { LoginForm } from "@/components/login-form"
-import { QrCode, Shield } from 'lucide-react'
+import { QrCode, Shield, ArrowLeft } from 'lucide-react'
 import Link from "next/link"
 import Image from "next/image"
+import { Button } from "@/components/ui/button"
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-b from-white via-gray-50 to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+    <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-b from-white via-gray-50 to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 relative">
+      {/* Bouton retour à l'accueil */}
+      <Link href="/" className="absolute top-6 right-6 z-50">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 rounded-full shadow-lg hover:shadow-xl transition-all hover:bg-[#FF6A33] hover:text-white hover:border-[#FF6A33]"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+      </Link>
       {/* Left side - Enhanced Branding with illustration */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 relative overflow-hidden">
         {/* Background decorations */}

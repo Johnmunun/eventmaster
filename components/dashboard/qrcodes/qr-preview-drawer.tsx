@@ -280,28 +280,49 @@ export function QRPreviewDrawer({ open, onOpenChange, qrCodeId }: QRPreviewDrawe
               <div className="relative flex justify-center">
                 <div className="bg-white dark:bg-gray-800 rounded-xl border-2 border-primary/10 p-4 flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow max-w-[280px] w-full min-h-[280px]">
                   {qrCode.imageUrl ? (
-                    <img
-                      src={qrCode.imageUrl}
-                      alt={qrCode.name}
-                      className="w-full h-auto object-contain max-w-full max-h-[250px]"
-                      onError={(e) => {
-                        console.error("Erreur de chargement de l'image:", qrCode.imageUrl)
-                        // Afficher le fallback si l'image ne charge pas
-                        const target = e.currentTarget
-                        target.style.display = 'none'
-                        const fallback = target.nextElementSibling as HTMLElement
-                        if (fallback) {
-                          fallback.style.display = 'flex'
-                        }
-                      }}
-                    />
-                  ) : null}
-                  <div className={`${qrCode.imageUrl ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}>
-                    <div className="text-center">
-                      <QrCodeIcon className="h-32 w-32 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Image non disponible</p>
+                    <>
+                      <img
+                        src={qrCode.imageUrl}
+                        alt={qrCode.name}
+                        className="w-full h-auto object-contain max-w-full max-h-[250px]"
+                        onError={(e) => {
+                          console.warn("Erreur de chargement de l'image depuis ImageKit:", qrCode.imageUrl)
+                          // Afficher le fallback si l'image ne charge pas
+                          const target = e.currentTarget
+                          target.style.display = 'none'
+                          // Trouver le conteneur parent et afficher le fallback
+                          const container = target.closest('div')
+                          if (container) {
+                            const fallback = container.querySelector('.image-fallback') as HTMLElement
+                            if (fallback) {
+                              fallback.style.display = 'flex'
+                            }
+                          }
+                        }}
+                        onLoad={() => {
+                          // Cacher le fallback si l'image charge avec succès
+                          const container = document.querySelector('.image-fallback') as HTMLElement
+                          if (container) {
+                            container.style.display = 'none'
+                          }
+                        }}
+                      />
+                      <div className="image-fallback hidden items-center justify-center w-full h-full absolute inset-0">
+                        <div className="text-center">
+                          <QrCodeIcon className="h-32 w-32 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Image non disponible</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">L'image n'a pas pu être chargée</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full">
+                      <div className="text-center">
+                        <QrCodeIcon className="h-32 w-32 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Image non disponible</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 

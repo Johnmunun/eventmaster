@@ -24,6 +24,8 @@ import {
   Move,
   Crop,
   Eye,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -46,11 +48,11 @@ import { FrameSelector } from "@/components/qr-frames/frame-selector";
 import { QRWithFrameSimple } from "@/components/qr-frames/qr-with-frame";
 import { EditableQRMockup } from "@/components/qr-frames/editable-qr-mockup";
 import { FrameConfig, QR_FRAMES, getFrameById } from "@/lib/qr-frames";
-// Import dynamique de qrcode pour éviter les problèmes SSR
-let QRCodeLib: any = null;
+// Import dynamique de qr-code-styling pour éviter les problèmes SSR
+let QRCodeStyling: any = null;
 if (typeof window !== "undefined") {
-  import("qrcode").then((module) => {
-    QRCodeLib = module.default;
+  import("qr-code-styling").then((module) => {
+    QRCodeStyling = module.default;
   });
 }
 
@@ -77,6 +79,138 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
         b: parseInt(result[3], 16),
       }
     : null;
+}
+
+// Fonction pour appliquer le zoom à une image
+function applyZoomToImage(imageDataUrl: string, zoom: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      // Créer un canvas avec la taille zoomée
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * zoom;
+      canvas.height = img.height * zoom;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Impossible d'obtenir le contexte du canvas"));
+        return;
+      }
+
+      // Dessiner l'image zoomée
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Convertir en data URL
+      const zoomedDataUrl = canvas.toDataURL("image/png");
+      resolve(zoomedDataUrl);
+    };
+
+    img.onerror = () => {
+      reject(new Error("Impossible de charger l'image"));
+    };
+
+    img.src = imageDataUrl;
+  });
+}
+
+// Fonction pour parser l'attribut 'd' du path SVG et extraire les coordonnées
+function parsePathData(
+  d: string
+): { x: number; y: number; width: number; height: number } | null {
+  if (!d) return null;
+
+  // Parser les commandes SVG path (m, M, l, L, h, H, v, V, z, Z)
+  const commands = d.match(/[mMlLhHvVzZ][^mMlLhHvVzZ]*/g) || [];
+  let x = 0,
+    y = 0;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  let startX = 0,
+    startY = 0;
+
+  commands.forEach((cmd) => {
+    const type = cmd[0];
+    const coords = cmd
+      .slice(1)
+      .trim()
+      .split(/[\s,]+/)
+      .filter((s) => s)
+      .map(parseFloat);
+
+    if (type === "m" || type === "M") {
+      // Move to
+      if (coords.length >= 2) {
+        if (type === "M") {
+          x = coords[0];
+          y = coords[1];
+        } else {
+          x += coords[0];
+          y += coords[1];
+        }
+        startX = x;
+        startY = y;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    } else if (type === "l" || type === "L") {
+      // Line to
+      if (coords.length >= 2) {
+        if (type === "L") {
+          x = coords[0];
+          y = coords[1];
+        } else {
+          x += coords[0];
+          y += coords[1];
+        }
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    } else if (type === "h" || type === "H") {
+      // Horizontal line
+      if (coords.length >= 1) {
+        if (type === "H") {
+          x = coords[0];
+        } else {
+          x += coords[0];
+        }
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+      }
+    } else if (type === "v" || type === "V") {
+      // Vertical line
+      if (coords.length >= 1) {
+        if (type === "V") {
+          y = coords[0];
+        } else {
+          y += coords[0];
+        }
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    } else if (type === "z" || type === "Z") {
+      // Close path
+      x = startX;
+      y = startY;
+    }
+  });
+
+  if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+  return null;
 }
 
 interface QRAppearanceStepProps {
@@ -280,6 +414,7 @@ export function QRAppearanceStep({
   );
   const [isLoadingFolders, setIsLoadingFolders] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1.2); // Zoom par défaut de 120% pour meilleure visibilité
   // États pour le QR code
   const [qrPosition, setQrPosition] = useState({ x: 50, y: 50 });
   const [qrSize, setQrSize] = useState({ width: 60, height: 60 });
@@ -488,14 +623,14 @@ export function QRAppearanceStep({
 
     setIsGenerating(true);
     try {
-      // Charger dynamiquement qrcode si nécessaire
-      if (!QRCodeLib && typeof window !== "undefined") {
+      // Charger dynamiquement qr-code-styling si nécessaire
+      if (!QRCodeStyling && typeof window !== "undefined") {
         try {
-          const module = await import("qrcode");
-          QRCodeLib = module.default;
+          const module = await import("qr-code-styling");
+          QRCodeStyling = module.default;
         } catch (importError) {
           console.error(
-            "Erreur lors du chargement de la bibliothèque QRCode:",
+            "Erreur lors du chargement de la bibliothèque QRCodeStyling:",
             importError
           );
           toast.error("Erreur", {
@@ -507,8 +642,8 @@ export function QRAppearanceStep({
         }
       }
 
-      if (!QRCodeLib) {
-        console.error("QRCode library not available");
+      if (!QRCodeStyling) {
+        console.error("QRCodeStyling library not available");
         toast.error("Erreur", {
           description:
             "La bibliothèque QR code n'est pas disponible. Veuillez rafraîchir la page.",
@@ -529,249 +664,272 @@ export function QRAppearanceStep({
         ? appearanceConfig.backgroundColor
         : "#FFFFFF";
 
-      const canvas = document.createElement("canvas");
+      // Mapper les motifs vers les types de qr-code-styling
+      const getDotsType = (
+        pattern: string
+      ):
+        | "square"
+        | "rounded"
+        | "dots"
+        | "classy"
+        | "classy-rounded"
+        | "extra-rounded" => {
+        switch (pattern) {
+          case "dots":
+            return "dots";
+          case "rounded":
+            return "rounded";
+          case "circle":
+            return "dots";
+          default:
+            return "square";
+        }
+      };
 
-      try {
-        await QRCodeLib.toCanvas(canvas, qrData, {
-          width: 300,
-          margin: 2,
-          color: {
-            dark: foregroundColor,
-            light: backgroundColor,
-          },
+      // Mapper les styles de coins
+      const getCornerSquareType = (
+        cornerStyle: string
+      ): "square" | "extra-rounded" => {
+        switch (cornerStyle) {
+          case "extra-rounded":
+            return "extra-rounded";
+          case "rounded":
+            return "extra-rounded";
+          default:
+            return "square";
+        }
+      };
+
+      // Calculer la taille de génération du QR code (plus grande pour meilleure qualité)
+      // On génère à une taille plus grande puis on redimensionne si nécessaire
+      const QR_GENERATION_SIZE = 500; // Taille de génération pour meilleure qualité
+
+      // Créer une instance de QRCodeStyling
+      const qrCode = new QRCodeStyling({
+        width: QR_GENERATION_SIZE,
+        height: QR_GENERATION_SIZE,
+        type: "canvas",
+        data: qrData,
+        margin: 2,
+        qrOptions: {
+          typeNumber: 0,
+          mode: "Byte",
           errorCorrectionLevel: "H",
+        },
+        imageOptions: {
+          hideBackgroundDots: true,
+          imageSize: appearanceConfig.logo ? 0.3 : 0,
+          margin: 0,
+          crossOrigin: "anonymous",
+        },
+        dotsOptions: {
+          color: foregroundColor,
+          type: getDotsType(appearanceConfig.pattern),
+        },
+        backgroundOptions: {
+          color: backgroundColor,
+        },
+        cornersSquareOptions: {
+          color: foregroundColor,
+          type: getCornerSquareType(appearanceConfig.cornerStyle),
+        },
+        cornersDotOptions: {
+          color: foregroundColor,
+          type: getDotsType(appearanceConfig.pattern),
+        },
+      });
+
+      // Ajouter le logo si présent
+      if (appearanceConfig.logo) {
+        qrCode.update({
+          image: appearanceConfig.logo,
         });
-      } catch (qrError: any) {
-        console.error("Erreur lors de la génération du canvas QR:", qrError);
-        throw new Error(
-          `Impossible de générer le QR code: ${
-            qrError?.message || "Erreur inconnue"
-          }`
-        );
       }
 
-      // Appliquer les motifs et coins personnalisés
+      // Générer le canvas - convertir le blob en canvas
+      const blob = await qrCode.getRawData("png");
+      if (!blob) {
+        throw new Error("Impossible de générer le QR code");
+      }
+
+      // Créer une image à partir du blob
+      const imageUrl = URL.createObjectURL(blob);
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () =>
+          reject(new Error("Impossible de charger l'image QR code"));
+        img.src = imageUrl;
+      });
+
+      // Créer un canvas à partir de l'image
+      const canvas = document.createElement("canvas");
+      canvas.width = QR_GENERATION_SIZE;
+      canvas.height = QR_GENERATION_SIZE;
       const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // Appliquer le motif en modifiant le rendu des pixels
-        if (appearanceConfig.pattern !== "square") {
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          const size = canvas.width;
-          const pixelSize = 1;
-
-          // Redessiner avec le motif choisi
-          ctx.fillStyle = appearanceConfig.backgroundColor;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          for (let y = 0; y < size; y += pixelSize) {
-            for (let x = 0; x < size; x += pixelSize) {
-              const index = (y * size + x) * 4;
-              const isDark = data[index] < 128;
-
-              if (isDark) {
-                ctx.fillStyle = appearanceConfig.foregroundColor;
-
-                if (appearanceConfig.pattern === "dots") {
-                  // Motif points - cercles
-                  ctx.beginPath();
-                  ctx.arc(
-                    x + pixelSize / 2,
-                    y + pixelSize / 2,
-                    pixelSize * 0.4,
-                    0,
-                    2 * Math.PI
-                  );
-                  ctx.fill();
-                } else if (appearanceConfig.pattern === "rounded") {
-                  // Motif arrondi - carrés avec coins arrondis
-                  const radius = pixelSize * 0.2;
-                  ctx.beginPath();
-                  ctx.moveTo(x + radius, y);
-                  ctx.lineTo(x + pixelSize - radius, y);
-                  ctx.quadraticCurveTo(
-                    x + pixelSize,
-                    y,
-                    x + pixelSize,
-                    y + radius
-                  );
-                  ctx.lineTo(x + pixelSize, y + pixelSize - radius);
-                  ctx.quadraticCurveTo(
-                    x + pixelSize,
-                    y + pixelSize,
-                    x + pixelSize - radius,
-                    y + pixelSize
-                  );
-                  ctx.lineTo(x + radius, y + pixelSize);
-                  ctx.quadraticCurveTo(
-                    x,
-                    y + pixelSize,
-                    x,
-                    y + pixelSize - radius
-                  );
-                  ctx.lineTo(x, y + radius);
-                  ctx.quadraticCurveTo(x, y, x + radius, y);
-                  ctx.closePath();
-                  ctx.fill();
-                } else if (appearanceConfig.pattern === "circle") {
-                  // Motif cercle - cercles ronds
-                  ctx.beginPath();
-                  ctx.arc(
-                    x + pixelSize / 2,
-                    y + pixelSize / 2,
-                    pixelSize * 0.45,
-                    0,
-                    2 * Math.PI
-                  );
-                  ctx.fill();
-                } else {
-                  // Par défaut, carré
-                  ctx.fillRect(x, y, pixelSize, pixelSize);
-                }
-              }
-            }
-          }
-        }
-
-        // Appliquer les coins arrondis aux carrés de détection
-        if (appearanceConfig.cornerStyle !== "square") {
-          const radius =
-            appearanceConfig.cornerStyle === "extra-rounded" ? 6 : 3;
-          const detectionSize = 7; // Taille des carrés de détection
-          const margin = 2;
-
-          // Fonction pour arrondir un carré de détection
-          const roundDetectionSquare = (startX: number, startY: number) => {
-            const tempCanvas = document.createElement("canvas");
-            tempCanvas.width = (detectionSize + margin * 2) * 10;
-            tempCanvas.height = (detectionSize + margin * 2) * 10;
-            const tempCtx = tempCanvas.getContext("2d");
-            if (tempCtx) {
-              tempCtx.scale(10, 10);
-              tempCtx.drawImage(
-                canvas,
-                startX - margin,
-                startY - margin,
-                detectionSize + margin * 2,
-                detectionSize + margin * 2,
-                0,
-                0,
-                detectionSize + margin * 2,
-                detectionSize + margin * 2
-              );
-
-              // Arrondir les coins
-              const roundedCanvas = document.createElement("canvas");
-              roundedCanvas.width = tempCanvas.width;
-              roundedCanvas.height = tempCanvas.height;
-              const roundedCtx = roundedCanvas.getContext("2d");
-              if (roundedCtx) {
-                roundedCtx.fillStyle = appearanceConfig.backgroundColor;
-                roundedCtx.fillRect(
-                  0,
-                  0,
-                  roundedCanvas.width,
-                  roundedCanvas.height
-                );
-                roundedCtx.globalCompositeOperation = "source-over";
-                roundedCtx.drawImage(tempCanvas, 0, 0);
-                ctx.drawImage(
-                  roundedCanvas,
-                  (startX - margin) * 10,
-                  (startY - margin) * 10,
-                  roundedCanvas.width,
-                  roundedCanvas.height
-                );
-              }
-            }
-          };
-
-          // Les 3 carrés de détection sont toujours aux mêmes positions approximatives
-          // Pour simplifier, on applique un filtre d'arrondi global
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          ctx.putImageData(imageData, 0, 0);
-        }
+      if (!ctx) {
+        throw new Error("Impossible d'obtenir le contexte du canvas");
       }
+      ctx.drawImage(img, 0, 0, QR_GENERATION_SIZE, QR_GENERATION_SIZE);
+      URL.revokeObjectURL(imageUrl);
 
-      // Appliquer le cadre si sélectionné - utiliser les vraies images de frame
+      // Appliquer le cadre si sélectionné - charger le SVG et utiliser qrArea automatiquement
       if (
         selectedFrame &&
         appearanceConfig.frameStyle &&
         appearanceConfig.frameStyle !== "none"
       ) {
-        // Charger l'image du frame
-        const frameImage = new window.Image();
-        frameImage.crossOrigin = "anonymous";
+        // Charger le SVG du frame
+        const svgFilename = selectedFrame.filename.replace(/\.png$/i, ".svg");
+        const svgResponse = await fetch(`/frames/${svgFilename}`);
+        if (!svgResponse.ok) {
+          throw new Error(`Impossible de charger le frame SVG: ${svgFilename}`);
+        }
+        const svgText = await svgResponse.text();
 
-        await new Promise<void>((resolve, reject) => {
-          frameImage.onload = () => resolve();
-          frameImage.onerror = () => {
-            console.error(
-              `Erreur lors du chargement du frame: ${selectedFrame.filename}`
-            );
-            reject(
-              new Error(
-                `Impossible de charger le frame: ${selectedFrame.filename}`
-              )
-            );
-          };
-          frameImage.src = `/frames/${selectedFrame.filename}`;
+        // Parser le SVG
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+
+        // Vérifier les erreurs de parsing
+        const parserError = svgDoc.querySelector("parsererror");
+        if (parserError) {
+          throw new Error("Erreur lors du parsing du SVG du frame");
+        }
+
+        // Trouver le path avec id="qrArea"
+        const qrArea = svgDoc.querySelector("path#qrArea");
+        if (!qrArea) {
+          throw new Error(
+            `Le frame SVG ne contient pas de <path id="qrArea">. Vérifiez que votre SVG contient bien un path avec id="qrArea"`
+          );
+        }
+
+        // Parser l'attribut 'd' du path pour obtenir les coordonnées
+        const pathData = qrArea.getAttribute("d");
+        let parsedPath = pathData ? parsePathData(pathData) : null;
+
+        // Obtenir le bbox du path
+        let bbox: { x: number; y: number; width: number; height: number };
+        try {
+          // S'assurer que le path est visible pour getBBox()
+          const originalDisplay = qrArea.getAttribute("style");
+          qrArea.setAttribute(
+            "style",
+            "display: block; visibility: visible; opacity: 1;"
+          );
+          const svgPath = qrArea as SVGPathElement;
+          bbox = svgPath.getBBox();
+          if (originalDisplay) {
+            qrArea.setAttribute("style", originalDisplay);
+          }
+        } catch (e) {
+          console.warn("Erreur getBBox(), utilisation des données parsées:", e);
+          bbox = { x: 0, y: 0, width: 0, height: 0 };
+        }
+
+        // Si le bbox est invalide (0x0), utiliser les données parsées du path
+        if ((!bbox.width || bbox.width === 0) && parsedPath) {
+          console.log("BBox invalide, utilisation des données parsées du path");
+          bbox = parsedPath;
+        }
+
+        // Calculer la taille du QR code à partir du rectangle qrArea
+        // Utiliser 85% de la plus petite dimension pour une bonne visibilité
+        let qrSize = Math.min(bbox.width, bbox.height) * 0.85;
+        const MIN_QR_SIZE = 150; // Taille minimale augmentée pour meilleure qualité
+        if (!qrSize || qrSize < MIN_QR_SIZE || !isFinite(qrSize)) {
+          qrSize = MIN_QR_SIZE;
+        }
+        qrSize = Math.ceil(qrSize);
+
+        // Position du QR code dans le rectangle
+        let qrX = bbox.x || 0;
+        let qrY = bbox.y || 0;
+        const rectWidth = bbox.width || 0;
+        const rectHeight = bbox.height || 0;
+
+        // Si les coordonnées sont 0 et qu'on a des données parsées, les utiliser
+        if (qrX === 0 && qrY === 0 && parsedPath) {
+          qrX = parsedPath.x;
+          qrY = parsedPath.y;
+        }
+
+        // Centrer le QR code dans le rectangle si le rectangle est plus grand
+        if (rectWidth > 0 && rectHeight > 0) {
+          if (rectWidth > qrSize) {
+            qrX = qrX + (rectWidth - qrSize) / 2;
+          }
+          if (rectHeight > qrSize) {
+            qrY = qrY + (rectHeight - qrSize) / 2;
+          }
+        }
+
+        console.log("QR code positionné automatiquement dans qrArea:", {
+          qrX,
+          qrY,
+          qrSize,
+          rectWidth,
+          rectHeight,
         });
 
-        // Créer un canvas pour le frame avec les paramètres de position/taille/crop
+        // Obtenir les dimensions du SVG depuis le viewBox
+        const svgRoot = svgDoc.querySelector("svg");
+        let svgOriginalWidth = EXPORT_WIDTH_FINAL;
+        let svgOriginalHeight = EXPORT_HEIGHT_FINAL;
+
+        if (svgRoot) {
+          const viewBox = svgRoot.getAttribute("viewBox");
+          if (viewBox) {
+            const [, , vw, vh] = viewBox.split(" ").map(parseFloat);
+            svgOriginalWidth = vw || EXPORT_WIDTH_FINAL;
+            svgOriginalHeight = vh || EXPORT_HEIGHT_FINAL;
+          } else {
+            const width = svgRoot.getAttribute("width");
+            const height = svgRoot.getAttribute("height");
+            if (width) svgOriginalWidth = parseFloat(width);
+            if (height) svgOriginalHeight = parseFloat(height);
+          }
+        }
+
+        // Utiliser une taille de canvas fixe plus grande pour une meilleure qualité
+        // Appliquer le zoom au canvas final
         const finalCanvas = document.createElement("canvas");
-        // Taille fixe du canvas pour l'export (même proportions que PhoneMockup)
-        finalCanvas.width = EXPORT_WIDTH_FINAL;
-        finalCanvas.height = EXPORT_HEIGHT_FINAL;
-
-        // PRIORITÉ: Utiliser d'abord les états locaux (qui sont toujours à jour), puis appearanceConfig, puis valeurs par défaut
-        const framePos = framePosition ||
-          appearanceConfig.framePosition || { x: 50, y: 50 };
-        const frameSz = frameSize ||
-          appearanceConfig.frameSize || { width: 80, height: 80 };
-        const frameCrp = frameCrop ||
-          appearanceConfig.frameCrop || { x: 0, y: 0, width: 100, height: 100 };
-
-        console.log("Génération Frame avec paramètres (%):", {
-          framePos,
-          frameSz,
-          frameCrp,
-        });
-
-        // 🔥 CONVERSION % → PIXELS (obligatoire avant le rendu)
-        const frameWidthPx = percentToPixels(frameSz.width, "width");
-        const frameHeightPx = percentToPixels(frameSz.height, "height");
-        const frameXPx =
-          percentToPixels(framePos.x, "width") - frameWidthPx / 2;
-        const frameYPx =
-          percentToPixels(framePos.y, "height") - frameHeightPx / 2;
-
-        // Crop en pixels
-        const cropXPx = (frameWidthPx * frameCrp.x) / 100;
-        const cropYPx = (frameHeightPx * frameCrp.y) / 100;
-        const cropWidthPx = (frameWidthPx * frameCrp.width) / 100;
-        const cropHeightPx = (frameHeightPx * frameCrp.height) / 100;
-
-        console.log("Frame converti en pixels:", {
-          frameXPx,
-          frameYPx,
-          frameWidthPx,
-          frameHeightPx,
-          cropXPx,
-          cropYPx,
-          cropWidthPx,
-          cropHeightPx,
-        });
+        finalCanvas.width = EXPORT_WIDTH_FINAL * zoomLevel;
+        finalCanvas.height = EXPORT_HEIGHT_FINAL * zoomLevel;
         const finalCtx = finalCanvas.getContext("2d");
 
         if (!finalCtx) {
           throw new Error("Impossible d'obtenir le contexte du canvas");
         }
 
-        // Fond transparent ou couleur de fond
-        if (appearanceConfig.frameBackgroundTransparent) {
-          finalCtx.clearRect(0, 0, finalCanvas.width, finalCanvas.height);
-        } else {
+        // Calculer le facteur d'échelle pour redimensionner le SVG (avec zoom)
+        const canvasWidth = EXPORT_WIDTH_FINAL * zoomLevel;
+        const canvasHeight = EXPORT_HEIGHT_FINAL * zoomLevel;
+        const scaleX = canvasWidth / svgOriginalWidth;
+        const scaleY = canvasHeight / svgOriginalHeight;
+        // Utiliser le facteur le plus petit pour préserver les proportions
+        const scale = Math.min(scaleX, scaleY);
+
+        // Dimensions du SVG redimensionné
+        const scaledSvgWidth = svgOriginalWidth * scale;
+        const scaledSvgHeight = svgOriginalHeight * scale;
+
+        // Position pour centrer le SVG
+        const svgX = (canvasWidth - scaledSvgWidth) / 2;
+        const svgY = (canvasHeight - scaledSvgHeight) / 2;
+
+        console.log("Dimensions SVG:", {
+          original: `${svgOriginalWidth}x${svgOriginalHeight}`,
+          scaled: `${scaledSvgWidth}x${scaledSvgHeight}`,
+          scale,
+          position: `${svgX}, ${svgY}`,
+        });
+
+        // Dessiner le fond si nécessaire
+        if (!appearanceConfig.frameBackgroundTransparent) {
           if (appearanceConfig.frameBackgroundUseGradient) {
             const gradient = finalCtx.createLinearGradient(
               0,
@@ -788,140 +946,57 @@ export function QRAppearanceStep({
           finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
         }
 
-        // Sauvegarder le contexte pour le clip
-        finalCtx.save();
+        // Convertir le SVG en image pour le dessiner sur le canvas
+        const svgBlob = new Blob([svgText], { type: "image/svg+xml" });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        const svgImage = new window.Image();
+        svgImage.crossOrigin = "anonymous";
 
-        // Appliquer le clip pour le crop
-        finalCtx.beginPath();
-        finalCtx.rect(frameXPx, frameYPx, cropWidthPx, cropHeightPx);
-        finalCtx.clip();
-
-        // Appliquer le filtre de couleur si supporté
-        if (selectedFrame.supportsColorChange && appearanceConfig.frameColor) {
-          const filter = createColorFilter(appearanceConfig.frameColor);
-          // Note: Les filtres CSS ne peuvent pas être appliqués directement au canvas
-          // On doit utiliser une approche différente avec des opérations de canvas
-          // Pour l'instant, on dessine l'image normalement
-        }
-
-        // Dessiner le frame avec coordonnées en pixels
-        // Le frame doit être redimensionné pour correspondre à la taille calculée
-        // Calculer le crop source depuis l'image du frame
-        const frameSourceWidth = frameImage.width;
-        const frameSourceHeight = frameImage.height;
-        const frameSourceCropX = (frameSourceWidth * frameCrp.x) / 100;
-        const frameSourceCropY = (frameSourceHeight * frameCrp.y) / 100;
-        const frameSourceCropWidth = (frameSourceWidth * frameCrp.width) / 100;
-        const frameSourceCropHeight =
-          (frameSourceHeight * frameCrp.height) / 100;
-
-        finalCtx.drawImage(
-          frameImage,
-          frameSourceCropX,
-          frameSourceCropY,
-          frameSourceCropWidth,
-          frameSourceCropHeight, // Source (crop de l'image frame)
-          frameXPx,
-          frameYPx,
-          cropWidthPx,
-          cropHeightPx // Destination (position et taille finales en pixels)
-        );
-
-        // Restaurer le contexte
-        finalCtx.restore();
-
-        // Dessiner le QR code avec position/taille/crop
-        // PRIORITÉ: Utiliser d'abord les états locaux (qui sont toujours à jour), puis appearanceConfig, puis valeurs par défaut
-        const qrPos = qrPosition ||
-          appearanceConfig.qrPosition || { x: 50, y: 50 };
-        const qrSz = qrSize ||
-          appearanceConfig.qrSize || { width: 60, height: 60 };
-        const qrCrp = qrCrop ||
-          appearanceConfig.qrCrop || { x: 0, y: 0, width: 100, height: 100 };
-
-        console.log("Génération QR avec paramètres (%):", {
-          qrPos,
-          qrSz,
-          qrCrp,
+        await new Promise<void>((resolve, reject) => {
+          svgImage.onload = () => resolve();
+          svgImage.onerror = () =>
+            reject(new Error("Impossible de charger le SVG"));
+          svgImage.src = svgUrl;
         });
 
-        // 🔥 CONVERSION % → PIXELS (obligatoire avant le rendu)
-        const qrWidthPx = percentToPixels(qrSz.width, "width");
-        const qrHeightPx = percentToPixels(qrSz.height, "height");
-        const qrXPx = percentToPixels(qrPos.x, "width") - qrWidthPx / 2;
-        const qrYPx = percentToPixels(qrPos.y, "height") - qrHeightPx / 2;
+        // Dessiner le SVG sur le canvas avec le redimensionnement
+        finalCtx.drawImage(
+          svgImage,
+          svgX,
+          svgY,
+          scaledSvgWidth,
+          scaledSvgHeight
+        );
+        URL.revokeObjectURL(svgUrl);
 
-        // Crop en pixels (relatif à la taille finale du QR)
-        const qrCropWidthPx = (qrWidthPx * qrCrp.width) / 100;
-        const qrCropHeightPx = (qrHeightPx * qrCrp.height) / 100;
+        // Ajuster les coordonnées du QR code avec le facteur d'échelle
+        // Le zoom est déjà appliqué au canvas, donc on n'a pas besoin de le multiplier ici
+        const scaledQrX = svgX + qrX * scale;
+        const scaledQrY = svgY + qrY * scale;
+        const scaledQrSize = qrSize * scale;
 
-        console.log("QR converti en pixels:", {
-          qrXPx,
-          qrYPx,
-          qrWidthPx,
-          qrHeightPx,
-          qrCropWidthPx,
-          qrCropHeightPx,
-          canvasSize: `${canvas.width}x${canvas.height}`,
+        console.log("QR code redimensionné:", {
+          original: `${qrX}, ${qrY}, ${qrSize}`,
+          scaled: `${scaledQrX}, ${scaledQrY}, ${scaledQrSize}`,
+          scale,
         });
 
-        // Sauvegarder le contexte pour le clip du QR
-        finalCtx.save();
-
-        // Appliquer le clip pour le crop du QR
-        finalCtx.beginPath();
-        finalCtx.rect(qrXPx, qrYPx, qrCropWidthPx, qrCropHeightPx);
-        finalCtx.clip();
-
-        // 🔥 IMPORTANT: Dessiner le QR code en préservant les proportions
-        // Le crop source est calculé en pourcentage du canvas source (300x300)
-        // Puis redimensionné vers la taille finale en respectant les proportions
-        const sourceCropX = (canvas.width * qrCrp.x) / 100;
-        const sourceCropY = (canvas.height * qrCrp.y) / 100;
-        const sourceCropWidth = (canvas.width * qrCrp.width) / 100;
-        const sourceCropHeight = (canvas.height * qrCrp.height) / 100;
-
-        // Calculer les proportions pour éviter la déformation
-        // Le QR code source est carré (300x300), donc on doit maintenir le ratio 1:1
-        const sourceAspectRatio = sourceCropWidth / sourceCropHeight;
-        const destAspectRatio = qrCropWidthPx / qrCropHeightPx;
-
-        let finalDestWidth = qrCropWidthPx;
-        let finalDestHeight = qrCropHeightPx;
-        let finalDestX = qrXPx;
-        let finalDestY = qrYPx;
-
-        // Si les proportions ne correspondent pas, ajuster pour préserver l'aspect ratio du QR code
-        // Le QR code doit rester carré pour être scannable
-        // Utiliser la PLUS GRANDE dimension pour préserver la taille maximale
-        if (Math.abs(sourceAspectRatio - destAspectRatio) > 0.01) {
-          // Utiliser la plus grande dimension pour maintenir un carré de taille raisonnable
-          const maxSize = Math.max(qrCropWidthPx, qrCropHeightPx);
-          finalDestWidth = maxSize;
-          finalDestHeight = maxSize;
-          // Recentrer
-          finalDestX = qrXPx + (qrCropWidthPx - finalDestWidth) / 2;
-          finalDestY = qrYPx + (qrCropHeightPx - finalDestHeight) / 2;
-        }
-
+        // Dessiner le QR code à la position calculée dans le qrArea (redimensionné)
         finalCtx.drawImage(
-          canvas,
-          sourceCropX,
-          sourceCropY,
-          sourceCropWidth,
-          sourceCropHeight, // Source (crop du canvas 300x300)
-          finalDestX,
-          finalDestY,
-          finalDestWidth,
-          finalDestHeight // Destination (position et taille finales en pixels, proportions préservées)
+          canvas, // QR code canvas (500x500)
+          0,
+          0,
+          canvas.width,
+          canvas.height, // Source (QR code complet)
+          scaledQrX,
+          scaledQrY,
+          scaledQrSize,
+          scaledQrSize // Destination (position et taille dans le qrArea, redimensionné)
         );
-
-        // Restaurer le contexte
-        finalCtx.restore();
 
         const finalDataUrl = finalCanvas.toDataURL("image/png");
         console.log(
-          "QR code généré avec frame réel, longueur:",
+          "QR code généré avec frame SVG, longueur:",
           finalDataUrl.length
         );
         setQrCodeImage(finalDataUrl);
@@ -953,9 +1028,9 @@ export function QRAppearanceStep({
           qrCrp.height !== 100
         ) {
           const finalCanvas = document.createElement("canvas");
-          // Taille fixe du canvas pour l'export (même proportions que PhoneMockup)
-          finalCanvas.width = EXPORT_WIDTH_FINAL;
-          finalCanvas.height = EXPORT_HEIGHT_FINAL;
+          // Taille fixe du canvas pour l'export avec zoom appliqué
+          finalCanvas.width = EXPORT_WIDTH_FINAL * zoomLevel;
+          finalCanvas.height = EXPORT_HEIGHT_FINAL * zoomLevel;
           const finalCtx = finalCanvas.getContext("2d");
 
           if (finalCtx) {
@@ -963,11 +1038,14 @@ export function QRAppearanceStep({
             finalCtx.fillStyle = appearanceConfig.backgroundColor;
             finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-            // 🔥 CONVERSION % → PIXELS (obligatoire avant le rendu)
-            const qrWidthPx = percentToPixels(qrSz.width, "width");
-            const qrHeightPx = percentToPixels(qrSz.height, "height");
-            const qrXPx = percentToPixels(qrPos.x, "width") - qrWidthPx / 2;
-            const qrYPx = percentToPixels(qrPos.y, "height") - qrHeightPx / 2;
+            // 🔥 CONVERSION % → PIXELS avec zoom (obligatoire avant le rendu)
+            const qrWidthPx = percentToPixels(qrSz.width, "width") * zoomLevel;
+            const qrHeightPx =
+              percentToPixels(qrSz.height, "height") * zoomLevel;
+            const qrXPx =
+              (percentToPixels(qrPos.x, "width") - qrWidthPx / 2) * zoomLevel;
+            const qrYPx =
+              (percentToPixels(qrPos.y, "height") - qrHeightPx / 2) * zoomLevel;
 
             // Crop en pixels (relatif à la taille finale du QR)
             const qrCropWidthPx = (qrWidthPx * qrCrp.width) / 100;
@@ -1044,21 +1122,23 @@ export function QRAppearanceStep({
             setQrCodeImage(dataUrl);
           }
         } else {
-          // Valeurs par défaut : créer un canvas avec la taille fixe
+          // Valeurs par défaut : créer un canvas avec la taille fixe et zoom
           const finalCanvas = document.createElement("canvas");
-          finalCanvas.width = EXPORT_WIDTH_FINAL;
-          finalCanvas.height = EXPORT_HEIGHT_FINAL;
+          finalCanvas.width = EXPORT_WIDTH_FINAL * zoomLevel;
+          finalCanvas.height = EXPORT_HEIGHT_FINAL * zoomLevel;
           const finalCtx = finalCanvas.getContext("2d");
 
           if (finalCtx) {
             finalCtx.fillStyle = appearanceConfig.backgroundColor;
             finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-            // Centrer le QR code par défaut
+            // Centrer le QR code par défaut (avec zoom)
             const qrSizePx =
-              Math.min(EXPORT_WIDTH_FINAL, EXPORT_HEIGHT_FINAL) * 0.6;
-            const qrXPx = (EXPORT_WIDTH_FINAL - qrSizePx) / 2;
-            const qrYPx = (EXPORT_HEIGHT_FINAL - qrSizePx) / 2;
+              Math.min(EXPORT_WIDTH_FINAL, EXPORT_HEIGHT_FINAL) *
+              0.6 *
+              zoomLevel;
+            const qrXPx = (finalCanvas.width - qrSizePx) / 2;
+            const qrYPx = (finalCanvas.height - qrSizePx) / 2;
 
             finalCtx.drawImage(canvas, qrXPx, qrYPx, qrSizePx, qrSizePx);
             const dataUrl = finalCanvas.toDataURL("image/png");
@@ -1113,6 +1193,7 @@ export function QRAppearanceStep({
     framePosition,
     frameSize,
     frameCrop,
+    zoomLevel, // Inclure zoomLevel pour régénérer quand le zoom change
   ]);
 
   // Générer le QR code quand les paramètres changent (mais pas pendant le mode édition)
@@ -1175,11 +1256,15 @@ export function QRAppearanceStep({
 
     setIsSubmitting(true);
     try {
+      // Appliquer le zoom à l'image avant le téléchargement
+      const zoomedImage = await applyZoomToImage(qrCodeImage, zoomLevel);
+
       console.log("Appel de onCreate avec:", {
-        qrCodeImageLength: qrCodeImage.length,
+        qrCodeImageLength: zoomedImage.length,
         appearanceConfig,
+        zoomLevel,
       });
-      await onCreate(qrCodeImage, appearanceConfig);
+      await onCreate(zoomedImage, appearanceConfig);
       // Si la création réussit, le drawer se ferme donc on ne réinitialise pas ici
     } catch (error) {
       console.error("Erreur lors de la création:", error);
@@ -1898,95 +1983,36 @@ export function QRAppearanceStep({
               </button>
             </div>
 
-            {/* Bouton pour activer/désactiver le mode édition */}
+            {/* Boutons Zoom */}
             {viewMode === "qrcode" && (qrCodeImage || qrData) && (
-              <Button
-                type="button"
-                variant={editMode ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  const newEditMode = !editMode;
-                  setEditMode(newEditMode);
-
-                  // Réinitialiser les positions au centre quand on active le mode édition
-                  if (newEditMode) {
-                    setQrPosition({ x: 50, y: 50 });
-                    setFramePosition({ x: 50, y: 50 });
-                    setQrSize({ width: 60, height: 60 });
-                    setFrameSize({ width: 80, height: 80 });
-                    setQrCrop({ x: 0, y: 0, width: 100, height: 100 });
-                    setFrameCrop({ x: 0, y: 0, width: 100, height: 100 });
-                    // Mettre à jour appearanceConfig aussi
-                    setAppearanceConfig((prev) => ({
-                      ...prev,
-                      qrPosition: { x: 50, y: 50 },
-                      framePosition: { x: 50, y: 50 },
-                      qrSize: { width: 60, height: 60 },
-                      frameSize: { width: 80, height: 80 },
-                      qrCrop: { x: 0, y: 0, width: 100, height: 100 },
-                      frameCrop: { x: 0, y: 0, width: 100, height: 100 },
-                    }));
-                  } else {
-                    // Régénérer le QR code quand on désactive le mode édition pour appliquer les paramètres
-                    // IMPORTANT: Synchroniser d'abord les états locaux avec appearanceConfig
-                    // pour s'assurer que toutes les modifications sont prises en compte
-                    if (qrData) {
-                      // Mettre à jour appearanceConfig avec les valeurs actuelles des états locaux
-                      // Utiliser une fonction de callback pour s'assurer d'avoir les valeurs les plus récentes
-                      setAppearanceConfig((prev) => {
-                        const updated = {
-                          ...prev,
-                          qrPosition: qrPosition,
-                          qrSize: qrSize,
-                          qrCrop: qrCrop,
-                          framePosition: framePosition,
-                          frameSize: frameSize,
-                          frameCrop: frameCrop,
-                        };
-                        console.log(
-                          "appearanceConfig mis à jour avec valeurs locales:",
-                          {
-                            qrPosition: updated.qrPosition,
-                            qrSize: updated.qrSize,
-                            framePosition: updated.framePosition,
-                            frameSize: updated.frameSize,
-                          }
-                        );
-                        return updated;
-                      });
-
-                      // Utiliser requestAnimationFrame pour s'assurer que le state est mis à jour
-                      requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                          console.log(
-                            "Régénération après mode édition avec valeurs:",
-                            {
-                              qrPosition: qrPosition,
-                              qrSize: qrSize,
-                              framePosition: framePosition,
-                              frameSize: frameSize,
-                            }
-                          );
-                          generateQRCode();
-                        });
-                      });
-                    }
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-2"
-              >
-                {editMode ? (
-                  <>
-                    <Crop className="h-4 w-4" />
-                    Mode Édition
-                  </>
-                ) : (
-                  <>
-                    <Move className="h-4 w-4" />
-                    Éditer Position
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setZoomLevel((prev) => Math.min(prev + 0.1, 3)); // Max 300%
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2"
+                  title="Zoomer"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                  Zoom +
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setZoomLevel((prev) => Math.max(prev - 0.1, 0.5)); // Min 50%
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2"
+                  title="Dézoomer"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                  Zoom -
+                </Button>
+              </div>
             )}
           </div>
 
@@ -2034,7 +2060,11 @@ export function QRAppearanceStep({
                         <img
                           src={qrCodeImage}
                           alt="QR Code"
-                          className="max-w-full max-h-full object-contain"
+                          className="w-full h-full object-cover"
+                          style={{
+                            transform: `scale(${zoomLevel})`,
+                            transformOrigin: "center center",
+                          }}
                         />
                       ) : (
                         // Sinon, afficher le QR code sans frame (fallback)
@@ -2286,17 +2316,30 @@ export function QRAppearanceStep({
               </Button>
             </div>
 
-            {/* Toggle pour activer le mode édition sur mobile */}
+            {/* Boutons Zoom sur mobile */}
             {!editMode && (qrCodeImage || qrData) && (
-              <div className="mb-4 flex justify-center">
+              <div className="mb-4 flex gap-2 justify-center">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setEditMode(true)}
+                  onClick={() => {
+                    setZoomLevel((prev) => Math.min(prev + 0.1, 3));
+                  }}
                   className="bg-white/90 text-gray-900 border-white/50 hover:bg-white"
                 >
-                  <Move className="h-4 w-4 mr-2" />
-                  Éditer Position
+                  <ZoomIn className="h-4 w-4 mr-2" />
+                  Zoom +
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setZoomLevel((prev) => Math.max(prev - 0.1, 0.5));
+                  }}
+                  className="bg-white/90 text-gray-900 border-white/50 hover:bg-white"
+                >
+                  <ZoomOut className="h-4 w-4 mr-2" />
+                  Zoom -
                 </Button>
               </div>
             )}
@@ -2338,7 +2381,11 @@ export function QRAppearanceStep({
                       <img
                         src={qrCodeImage}
                         alt="QR Code"
-                        className="max-w-full max-h-full object-contain"
+                        className="w-full h-full object-cover"
+                        style={{
+                          transform: `scale(${zoomLevel})`,
+                          transformOrigin: "center center",
+                        }}
                       />
                     ) : (
                       <div className="flex items-center justify-center w-full h-full">

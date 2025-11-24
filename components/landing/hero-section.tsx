@@ -65,6 +65,46 @@ export function LandingHeroSection() {
             </Link>
           </div>
 
+          {/* Social Proof Section */}
+          <div className="flex flex-col items-center gap-3 pt-4 sm:pt-6 animate-fade-in-up" style={{ animationDelay: '350ms' }}>
+            <div className="flex items-center gap-3">
+              {/* Profile pictures overlapping */}
+              <div className="flex -space-x-3">
+                <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white dark:border-gray-900 overflow-hidden bg-gradient-to-br from-blue-400 to-blue-600">
+                  <img 
+                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face" 
+                    alt="User 1" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white dark:border-gray-900 overflow-hidden bg-gradient-to-br from-purple-400 to-purple-600">
+                  <img 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face" 
+                    alt="User 2" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white dark:border-gray-900 overflow-hidden bg-gradient-to-br from-pink-400 to-pink-600">
+                  <img 
+                    src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face" 
+                    alt="User 3" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white dark:border-gray-900 overflow-hidden bg-gradient-to-br from-green-400 to-green-600">
+                  <img 
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face" 
+                    alt="User 4" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 font-medium">
+                Plus de <span className="font-bold text-gray-900 dark:text-white">120 utilisateurs</span> l'utilisent déjà
+              </p>
+            </div>
+          </div>
+
           {/* Key Features Pills with better styling */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-6 sm:pt-8 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
             <div className="group flex items-center gap-2 px-4 py-2.5 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-800/50 hover:border-[#FF6A33]/30 hover:bg-white/80 dark:hover:bg-gray-900/80 transition-all duration-300 hover:scale-105">

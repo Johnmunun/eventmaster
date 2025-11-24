@@ -331,6 +331,7 @@ export async function GET(request: NextRequest) {
 
     const formattedQRCodes = qrCodes.map(qr => {
       const qrData = qr.data as any
+      const templateData = qr.templateData as any
       // Utiliser ImageKit si disponible, sinon base64
       const imageUrl = qrData?.imageKitUrl || qrData?.image || ""
       
@@ -338,6 +339,9 @@ export async function GET(request: NextRequest) {
       // Pour l'instant, on utilise scanned (1 si scanné, 0 sinon)
       // TODO: Implémenter un vrai compteur de scans si nécessaire
       const scanCount = qr.scanned ? 1 : 0
+      
+      // Extraire les données d'apparence depuis templateData ou data
+      const appearanceConfig = templateData?.appearanceConfig || qrData?.appearanceConfig || null
       
       return {
         id: qr.id,
@@ -355,6 +359,7 @@ export async function GET(request: NextRequest) {
         event: qr.event,
         folder: qr.folder, // Inclure le folder même s'il est null
         guest: qr.guest,
+        appearanceConfig: appearanceConfig, // Ajouter les données d'apparence
       }
     })
 

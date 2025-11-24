@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Calendar, Users, QrCode, Sparkles, Send, BarChart3, Palette, ScanLine, CreditCard, Settings, ChevronLeft, ChevronRight, Wallet, Menu, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { LayoutDashboard, Calendar, Users, QrCode, Sparkles, Send, BarChart3, Palette, ScanLine, CreditCard, Settings, ChevronLeft, ChevronRight, Wallet, Menu, X, Zap, ArrowUp } from 'lucide-react'
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 
@@ -13,14 +14,14 @@ const navigation = [
   { name: "Événements", href: "/dashboard/events", icon: Calendar },
   { name: "Invités", href: "/dashboard/guests", icon: Users },
   { name: "QR Codes & Badges", href: "/dashboard/qrcodes", icon: QrCode },
-  { name: "IA EventMaster", href: "/dashboard/ai", icon: Sparkles },
-  { name: "Communications", href: "/dashboard/communications", icon: Send },
-  { name: "Statistiques", href: "/dashboard/analytics", icon: BarChart3 },
-  { name: "Designer", href: "/dashboard/designer", icon: Palette },
-  { name: "Scanner", href: "/dashboard/scanner", icon: ScanLine },
-  { name: "Portefeuille", href: "/dashboard/wallet", icon: Wallet },
-  { name: "Facturation", href: "/dashboard/billing", icon: CreditCard },
-  { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
+  { name: "IA EventMaster", href: "/dashboard/ai", icon: Sparkles, soon: true },
+  { name: "Communications", href: "/dashboard/communications", icon: Send, soon: true },
+  { name: "Statistiques", href: "/dashboard/analytics", icon: BarChart3, soon: true },
+  { name: "Designer", href: "/dashboard/designer", icon: Palette, soon: true },
+  { name: "Scanner", href: "/dashboard/scanner", icon: ScanLine, soon: true },
+  { name: "Portefeuille", href: "/dashboard/wallet", icon: Wallet, soon: true },
+  { name: "Facturation", href: "/dashboard/billing", icon: CreditCard, soon: true },
+  { name: "Paramètres", href: "/dashboard/settings", icon: Settings, soon: true },
 ]
 
 // Hook pour détecter si on est sur mobile
@@ -62,7 +63,7 @@ function NavigationContent({
                 href={item.href}
                 onClick={onLinkClick}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm relative",
                   isActive
                     ? "bg-primary text-white shadow-md"
                     : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
@@ -71,7 +72,16 @@ function NavigationContent({
                 title={collapsed ? item.name : undefined}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && <span className="font-medium">{item.name}</span>}
+                {!collapsed && (
+                  <>
+                    <span className="font-medium flex-1">{item.name}</span>
+                    {item.soon && (
+                      <Badge className="bg-green-500 hover:bg-green-600 text-white text-[10px] px-1.5 py-0.5 font-semibold">
+                        Soon
+                      </Badge>
+                    )}
+                  </>
+                )}
               </Link>
             </li>
           )
@@ -84,8 +94,33 @@ function NavigationContent({
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [userCredits, setUserCredits] = useState<number | null>(null)
+  const [userPlan, setUserPlan] = useState<string>("FREE")
+  const [isLoadingUser, setIsLoadingUser] = useState(true)
   const pathname = usePathname()
+  const router = useRouter()
   const isMobile = useIsMobile()
+
+  // Charger les informations utilisateur
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await fetch("/api/user/profile")
+        const data = await response.json()
+        
+        if (data.success && data.user) {
+          setUserCredits(data.user.credits ?? 0)
+          setUserPlan(data.user.plan ?? "FREE")
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des infos utilisateur:", error)
+      } finally {
+        setIsLoadingUser(false)
+      }
+    }
+
+    fetchUserInfo()
+  }, [])
 
   // Sur mobile, on ne montre pas le sidebar par défaut
   if (isMobile) {
@@ -128,13 +163,37 @@ export function DashboardSidebar() {
             />
 
             {/* User Plan Badge */}
-            <div className="p-4 border-t border-border">
-              <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg p-3 border border-primary/20">
-                <div className="text-xs font-semibold text-primary mb-1">Plan Standard</div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">10$ / mois</div>
-                <Button size="sm" variant="outline" className="w-full mt-2 text-xs h-7">
-                  Améliorer le plan
-                </Button>
+            <div className="p-4 border-t border-border bg-white dark:bg-gray-900">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border-2 border-gray-200 dark:border-gray-700 shadow-lg">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                      Plan actuel
+                    </div>
+                    <div className="text-sm font-bold text-gray-900 dark:text-white">
+                      {userPlan === "FREE" ? "Basique" : userPlan === "STANDARD" ? "Standard" : "Premium"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-yellow-500" />
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Crédits</div>
+                        <div className="text-sm font-bold text-gray-900 dark:text-white">
+                          {isLoadingUser ? "..." : userCredits ?? 0}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold text-xs h-8 mt-2"
+                    onClick={() => router.push("/dashboard/billing")}
+                  >
+                    <ArrowUp className="h-3 w-3 mr-1" />
+                    Améliorer le plan
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -180,13 +239,37 @@ export function DashboardSidebar() {
 
       {/* User Plan Badge */}
       {!collapsed && (
-        <div className="p-4 border-t border-border">
-          <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg p-3 border border-primary/20">
-            <div className="text-xs font-semibold text-primary mb-1">Plan Standard</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">10$ / mois</div>
-            <Button size="sm" variant="outline" className="w-full mt-2 text-xs h-7">
-              Améliorer le plan
-            </Button>
+        <div className="p-4 border-t border-border bg-white dark:bg-gray-900">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border-2 border-gray-200 dark:border-gray-700 shadow-lg">
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                  Plan actuel
+                </div>
+                <div className="text-sm font-bold text-gray-900 dark:text-white">
+                  {userPlan === "FREE" ? "Basique" : userPlan === "STANDARD" ? "Standard" : "Premium"}
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-yellow-500" />
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Crédits</div>
+                    <div className="text-sm font-bold text-gray-900 dark:text-white">
+                      {isLoadingUser ? "..." : userCredits ?? 0}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold text-xs h-8 mt-2"
+                onClick={() => router.push("/dashboard/billing")}
+              >
+                <ArrowUp className="h-3 w-3 mr-1" />
+                Améliorer le plan
+              </Button>
+            </div>
           </div>
         </div>
       )}

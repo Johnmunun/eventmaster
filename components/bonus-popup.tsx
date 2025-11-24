@@ -13,12 +13,16 @@ interface BonusPopupProps {
 
 export function BonusPopup({ open, onClose, credits }: BonusPopupProps) {
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
     if (open) {
       setIsAnimating(true)
+      setIsVisible(true)
       const timer = setTimeout(() => setIsAnimating(false), 1000)
       return () => clearTimeout(timer)
+    } else {
+      setIsVisible(false)
     }
   }, [open])
 
@@ -28,9 +32,15 @@ export function BonusPopup({ open, onClose, credits }: BonusPopupProps) {
         <DialogTitle className="sr-only">
           Bonus de bienvenue - {credits} crédits offerts
         </DialogTitle>
-        <div className="relative">
+        <div 
+          className={`relative transition-all duration-500 ${
+            isVisible 
+              ? "opacity-100 scale-100 translate-y-0" 
+              : "opacity-0 scale-95 translate-y-4"
+          }`}
+        >
           {/* Effet de particules animées */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
             {[...Array(20)].map((_, i) => (
               <Sparkles
                 key={i}
@@ -48,11 +58,11 @@ export function BonusPopup({ open, onClose, credits }: BonusPopupProps) {
             ))}
           </div>
 
-          {/* Contenu principal */}
-          <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 backdrop-blur-sm rounded-2xl p-8 border-2 border-primary/20 shadow-2xl">
+          {/* Contenu principal avec fond blanc amélioré */}
+          <div className="relative bg-white dark:bg-gray-900 rounded-3xl p-8 md:p-10 border-4 border-primary/30 shadow-2xl">
             {/* Animation de pulse */}
             <div
-              className={`absolute inset-0 rounded-2xl bg-primary/20 ${
+              className={`absolute inset-0 rounded-3xl bg-primary/10 ${
                 isAnimating ? "animate-ping" : ""
               }`}
               style={{ animationDuration: "2s" }}
@@ -63,7 +73,7 @@ export function BonusPopup({ open, onClose, credits }: BonusPopupProps) {
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/30 rounded-full blur-xl animate-pulse" />
                 <div
-                  className={`relative bg-gradient-to-br from-primary to-accent p-6 rounded-full shadow-lg ${
+                  className={`relative bg-gradient-to-br from-primary to-accent p-6 rounded-full shadow-xl ${
                     isAnimating ? "animate-bounce" : ""
                   }`}
                   style={{ animationDuration: "0.6s" }}
@@ -74,41 +84,41 @@ export function BonusPopup({ open, onClose, credits }: BonusPopupProps) {
 
               {/* Titre */}
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                   🎉 Bienvenue !
                 </h2>
-                <p className="text-lg text-muted-foreground">
+                <p className="text-lg text-gray-700 dark:text-gray-300 font-medium">
                   Bonus de bienvenue offert
                 </p>
               </div>
 
               {/* Crédits */}
               <div className="space-y-3">
-                <div className="flex items-center justify-center gap-2 text-4xl font-bold text-primary">
-                  <Sparkles className="h-8 w-8 animate-spin" style={{ animationDuration: "3s" }} />
+                <div className="flex items-center justify-center gap-2 text-5xl font-bold text-primary">
+                  <Sparkles className="h-10 w-10 animate-spin text-primary" style={{ animationDuration: "3s" }} />
                   <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-pulse">
                     +{credits} crédits
                   </span>
-                  <Sparkles className="h-8 w-8 animate-spin" style={{ animationDuration: "3s", animationDirection: "reverse" }} />
+                  <Sparkles className="h-10 w-10 animate-spin text-primary" style={{ animationDuration: "3s", animationDirection: "reverse" }} />
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm">
                   Utilisez ces crédits pour générer des QR codes et accéder aux fonctionnalités premium
                 </p>
               </div>
 
-              {/* Liste des avantages */}
-              <div className="w-full space-y-2 bg-white/50 dark:bg-gray-900/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm">
+              {/* Liste des avantages avec fond blanc */}
+              <div className="w-full space-y-3 bg-gray-50 dark:bg-gray-800 rounded-xl p-5 border-2 border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
                   <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Crédits utilisables immédiatement</span>
+                  <span className="font-medium">Crédits utilisables immédiatement</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
                   <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Accès aux fonctionnalités premium</span>
+                  <span className="font-medium">Accès aux fonctionnalités premium</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
                   <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Génération de QR codes illimitée</span>
+                  <span className="font-medium">Génération de QR codes illimitée</span>
                 </div>
               </div>
 
@@ -116,7 +126,7 @@ export function BonusPopup({ open, onClose, credits }: BonusPopupProps) {
               <Button
                 onClick={onClose}
                 size="lg"
-                className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold shadow-lg hover:shadow-xl transition-all"
+                className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white font-semibold shadow-lg hover:shadow-xl transition-all text-base py-6"
               >
                 Commencer maintenant
               </Button>

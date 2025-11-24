@@ -142,22 +142,13 @@ export function FrameSelector({
                 title={frame.name}
               >
                 {/* Image du cadre */}
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800 overflow-hidden">
                   <img
-                    src={`/frames/${frame.filename}`}
+                    src={`/frames/${frame.filename.replace(/\.png$/i, '.svg')}`}
                     alt={frame.name}
-                    className="w-full h-full object-contain"
-                    style={{
-                      // Appliquer le filtre de couleur seulement si supporté et si une couleur est fournie
-                      // Ne pas appliquer de filtre par défaut pour que l'image soit visible
-                      filter: frame.supportsColorChange && frameColor && frameColor !== "#000000"
-                        ? createColorFilter(frameColor)
-                        : "none",
-                      opacity: 1, // S'assurer que l'image est visible
-                      display: "block", // S'assurer que l'image est affichée
-                    }}
+                    className="w-full h-full object-cover"
                     onError={(e) => {
-                      // Gérer gracieusement les images manquantes sans erreur console
+                      // Si le SVG échoue, afficher le placeholder directement
                       const target = e.target as HTMLImageElement
                       target.style.display = "none"
                       const parent = target.parentElement
@@ -177,6 +168,12 @@ export function FrameSelector({
                           return next
                         })
                       }
+                    }}
+                    style={{
+                      // Ne pas appliquer de filtre CSS aux SVG
+                      filter: "none",
+                      opacity: 1, // S'assurer que l'image est visible
+                      display: "block", // S'assurer que l'image est affichée
                     }}
                     onLoad={() => {
                       // Marquer ce frame comme disponible

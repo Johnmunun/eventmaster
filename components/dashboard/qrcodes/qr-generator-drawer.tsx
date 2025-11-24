@@ -1305,7 +1305,15 @@ export function QRGeneratorDrawer({ open, onOpenChange, onQRCodeCreated }: QRGen
       
       // Ajouter templateData si présent
       if (templateDataToSave) {
+        // Ajouter appearanceConfig dans templateData
+        templateDataToSave.appearanceConfig = appearanceConfig
         formData.append("templateData", JSON.stringify(templateDataToSave))
+      } else {
+        // Si pas de templateData, créer un objet avec appearanceConfig
+        const templateDataWithAppearance = {
+          appearanceConfig: appearanceConfig
+        }
+        formData.append("templateData", JSON.stringify(templateDataWithAppearance))
       }
       
       // Utiliser folderId de appearanceConfig en priorité, sinon customData
