@@ -164,6 +164,30 @@ export function DashboardOverview() {
     return new Intl.NumberFormat('fr-FR').format(num)
   }
 
+  // Couleurs de bordure pour chaque carte (orange, bleu, vert en rotation) avec transparence 95%
+  const borderColors = [
+    "border-orange-500/5",
+    "border-blue-500/5", 
+    "border-green-500/5",
+    "border-orange-500/5",
+    "border-blue-500/5",
+    "border-green-500/5",
+    "border-orange-500/5",
+    "border-blue-500/5",
+  ]
+  
+  // Couleurs d'ombre correspondantes
+  const shadowColors = [
+    "shadow-orange-500/20",
+    "shadow-blue-500/20",
+    "shadow-green-500/20",
+    "shadow-orange-500/20",
+    "shadow-blue-500/20",
+    "shadow-green-500/20",
+    "shadow-orange-500/20",
+    "shadow-blue-500/20",
+  ]
+
   const stats = statsData ? [
     {
       title: "Événements créés",
@@ -172,7 +196,9 @@ export function DashboardOverview() {
       icon: Calendar,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
-      trend: statsData.eventsThisMonth > 0 ? "up" : "neutral" as const
+      trend: statsData.eventsThisMonth > 0 ? "up" : "neutral" as const,
+      borderColor: borderColors[0],
+      shadowColor: shadowColors[0]
     },
     {
       title: "Événements en cours",
@@ -181,7 +207,9 @@ export function DashboardOverview() {
       icon: Clock,
       color: "text-green-600",
       bgColor: "bg-green-100",
-      trend: "neutral" as const
+      trend: "neutral" as const,
+      borderColor: borderColors[1],
+      shadowColor: shadowColors[1]
     },
     {
       title: "QR codes générés",
@@ -190,7 +218,9 @@ export function DashboardOverview() {
       icon: QrCode,
       color: "text-primary",
       bgColor: "bg-orange-100",
-      trend: statsData.qrCodesThisWeek > 0 ? "up" : "neutral" as const
+      trend: statsData.qrCodesThisWeek > 0 ? "up" : "neutral" as const,
+      borderColor: borderColors[2],
+      shadowColor: shadowColors[2]
     },
     {
       title: "Total d'invités",
@@ -199,7 +229,9 @@ export function DashboardOverview() {
       icon: Users,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
-      trend: statsData.guestsThisMonth > 0 ? "up" : "neutral" as const
+      trend: statsData.guestsThisMonth > 0 ? "up" : "neutral" as const,
+      borderColor: borderColors[3],
+      shadowColor: shadowColors[3]
     },
     {
       title: "Taux de confirmation",
@@ -208,7 +240,9 @@ export function DashboardOverview() {
       icon: CheckCircle2,
       color: "text-teal-600",
       bgColor: "bg-teal-100",
-      trend: parseFloat(statsData.confirmationRate) > 50 ? "up" : "neutral" as const
+      trend: parseFloat(statsData.confirmationRate) > 50 ? "up" : "neutral" as const,
+      borderColor: borderColors[4],
+      shadowColor: shadowColors[4]
     },
     {
       title: "Taux de présence",
@@ -217,7 +251,9 @@ export function DashboardOverview() {
       icon: TrendingUp,
       color: "text-indigo-600",
       bgColor: "bg-indigo-100",
-      trend: parseFloat(statsData.attendanceRate) > 50 ? "up" : "neutral" as const
+      trend: parseFloat(statsData.attendanceRate) > 50 ? "up" : "neutral" as const,
+      borderColor: borderColors[5],
+      shadowColor: shadowColors[5]
     },
     {
       title: "Total scans",
@@ -226,7 +262,9 @@ export function DashboardOverview() {
       icon: BarChart2,
       color: "text-pink-600",
       bgColor: "bg-pink-100",
-      trend: statsData.totalScans > 0 ? "up" : "neutral" as const
+      trend: statsData.totalScans > 0 ? "up" : "neutral" as const,
+      borderColor: borderColors[6],
+      shadowColor: shadowColors[6]
     },
     {
       title: "Invitations envoyées",
@@ -235,7 +273,9 @@ export function DashboardOverview() {
       icon: Send,
       color: "text-amber-600",
       bgColor: "bg-amber-100",
-      trend: statsData.invitationsSent > 0 ? "up" : "neutral" as const
+      trend: statsData.invitationsSent > 0 ? "up" : "neutral" as const,
+      borderColor: borderColors[7],
+      shadowColor: shadowColors[7]
     },
   ] : []
 
@@ -294,10 +334,12 @@ export function DashboardOverview() {
             Bienvenue {userName || "..."} ! Voici un aperçu complet de vos événements.
           </p>
         </div>
-        <Button size="lg" className="gap-2 w-full sm:w-auto">
-          <Plus className="h-5 w-5" />
-          Créer un événement
-        </Button>
+        <Link href="/dashboard/events">
+          <Button size="lg" className="gap-2 w-full sm:w-auto">
+            <Plus className="h-5 w-5" />
+            Créer un événement
+          </Button>
+        </Link>
       </div>
 
       {/* Stats Grid */}
@@ -314,36 +356,63 @@ export function DashboardOverview() {
         ) : (
           stats.map((stat, index) => {
           const Icon = stat.icon
+          
           return (
             <Card 
               key={index} 
-              className="group relative overflow-hidden border-2 border-transparent hover:border-primary/20 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 hover:-translate-y-1"
+              className={`group relative overflow-hidden border-4 ${stat.borderColor} bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1`}
             >
               {/* Effet de brillance au hover */}
               <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`relative p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-300`}>
-                    {/* Glow effect */}
-                    <div className={`absolute inset-0 rounded-xl ${stat.bgColor} blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300`} />
-                    <Icon className={`relative h-6 w-6 ${stat.color} drop-shadow-sm`} />
-                  </div>
-                  {stat.trend === "up" && (
-                    <div className="flex items-center gap-1 text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs font-semibold">
-                      <TrendingUp className="h-3 w-3" />
+              <CardContent className="p-4 sm:p-6 relative z-10">
+                {/* Layout mobile: horizontal avec chiffres à droite */}
+                <div className="flex flex-row sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-3 sm:gap-0">
+                  {/* Section gauche: Icône et titre (mobile) */}
+                  <div className="flex items-center gap-3 sm:block sm:mb-4">
+                    <div className={`relative p-2.5 sm:p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-300`}>
+                      {/* Glow effect */}
+                      <div className={`absolute inset-0 rounded-xl ${stat.bgColor} blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300`} />
+                      <Icon className={`relative h-5 w-5 sm:h-6 sm:w-6 ${stat.color} drop-shadow-sm`} />
                     </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3" />
-                    {stat.change}
-                  </p>
+                    <div className="sm:hidden">
+                      <p className="text-xs font-medium text-muted-foreground">{stat.title}</p>
+                    </div>
+                  </div>
+
+                  {/* Section droite: Chiffres embellis (mobile et desktop améliorés) */}
+                  <div className="flex flex-col items-end sm:items-start sm:space-y-2">
+                    {/* Mobile layout */}
+                    <div className="sm:hidden text-right">
+                      <p className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent leading-tight">
+                        {stat.value}
+                      </p>
+                      {stat.trend === "up" && (
+                        <div className="flex items-center justify-end gap-1 text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full text-[10px] font-semibold mt-1.5">
+                          <TrendingUp className="h-2.5 w-2.5" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Desktop layout amélioré */}
+                    <div className="hidden sm:block w-full">
+                      <div className="flex items-start justify-between mb-2">
+                        <p className="text-sm font-medium text-muted-foreground flex-1">{stat.title}</p>
+                        {stat.trend === "up" && (
+                          <div className="flex items-center gap-1 text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs font-semibold">
+                            <TrendingUp className="h-3 w-3" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 dark:from-white dark:via-gray-100 dark:to-gray-300 bg-clip-text text-transparent mb-2">
+                        {stat.value}
+                      </p>
+                      <p className="text-xs text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" />
+                        {stat.change}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -154,12 +154,12 @@ export function SignupForm() {
       })
 
       if (result?.ok) {
-        // Attendre un peu pour laisser le popup s'afficher
+        // Attendre au minimum 5 secondes pour laisser le popup s'afficher
         setTimeout(() => {
           setShowBonusPopup(false)
           router.push("/dashboard")
           router.refresh()
-        }, 3000)
+        }, 5000)
       }
     } catch (error) {
       setError("Une erreur est survenue")
